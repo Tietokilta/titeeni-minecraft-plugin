@@ -1,4 +1,4 @@
-package me.guild.titeenit.minigame.hidenseek;
+package me.guild.titeenit.minigame.jallupollo;
 
 import me.guild.titeenit.TiteeniPlugin;
 import me.guild.titeenit.minigame.MinigameState;
@@ -15,7 +15,7 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * Event handlers for Hide and Seek.
+ * Event handlers for Jallupöllö
  *
  * Registered on game start, unregistered on game stop.
  *
@@ -24,12 +24,12 @@ import org.bukkit.inventory.ItemStack;
  * role-transfer mechanic).  Environmental damage is also cancelled so only the
  * designed game mechanic ends the hider's turn.
  */
-public class HideAndSeekListener implements Listener {
+public class JallupolloListener implements Listener {
 
     private final TiteeniPlugin plugin;
-    private final HideAndSeekGame game;
+    private final JallupolloGame game;
 
-    public HideAndSeekListener(TiteeniPlugin plugin, HideAndSeekGame game) {
+    public JallupolloListener(TiteeniPlugin plugin, JallupolloGame game) {
         this.plugin = plugin;
         this.game   = game;
     }
@@ -66,20 +66,20 @@ public class HideAndSeekListener implements Listener {
     }
 
     // -------------------------------------------------------------------------
-    // Prevent the hider from losing the Reveal Potion
+    // Prevent the hider from losing the Jaloviina
     // -------------------------------------------------------------------------
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onItemDrop(PlayerDropItemEvent event) {
-        if (game.isHiderPotion(event.getItemDrop().getItemStack())) {
+        if (game.isJaloviina(event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
         }
     }
 
-    /** Cancel the consumption of the reveal potion so it can be used repeatedly. */
+    /** Cancel the consumption of the Jaloviina so it can be used repeatedly. */
     @EventHandler(priority = EventPriority.HIGH)
     public void onItemConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
-        if (game.isHiderPotion(event.getItem())) {
+        if (game.isJaloviina(event.getItem())) {
             event.setCancelled(true);
         }
     }
@@ -92,7 +92,7 @@ public class HideAndSeekListener implements Listener {
 
         ItemStack cursor  = event.getCursor();
         ItemStack current = event.getCurrentItem();
-        if (!game.isHiderPotion(cursor) && !game.isHiderPotion(current)) return;
+        if (!game.isJaloviina(cursor) && !game.isJaloviina(current)) return;
 
         // Stunned players cannot touch the potion at all
         if (game.isStunned(player)) {

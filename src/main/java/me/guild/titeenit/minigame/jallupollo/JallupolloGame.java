@@ -1,12 +1,8 @@
-package me.guild.titeenit.minigame.hidenseek;
+package me.guild.titeenit.minigame.jallupollo;
 
-import io.papermc.paper.datacomponent.DataComponentTypes;
-import io.papermc.paper.datacomponent.item.Consumable;
-import io.papermc.paper.datacomponent.item.consumable.ItemUseAnimation;
 import me.guild.titeenit.TiteeniPlugin;
 import me.guild.titeenit.minigame.Minigame;
 import me.guild.titeenit.minigame.MinigameState;
-import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -36,20 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Hide and Seek minigame.
- *
- * --- Drinking ---
- * The Reveal Potion has its consume duration set to 3600 s via the
- * DataComponent API.  This means the animation runs continuously for the
- * entire time the hider holds right-click — it never "finishes" and restarts.
- * No PlayerItemConsumeEvent cancel is needed.  The game tick simply polls
- * isHandRaised() to detect the drinking state.
- *
- * --- Locator Bar ---
- * setWaypointStyle / setWaypointColor are set on the hider while they drink
- * (red marker) and cleared when they stop.  All players' waypoints are also
- * reset at game start and stop to prevent stale red markers from a previous
- * round.
+ * Jallupöllö minigame
  *
  * --- Sound ---
  * The reveal sound (ENTITY_GENERIC_DRINK — the looping sip sound) is sent
@@ -59,7 +42,7 @@ import java.util.UUID;
  * distance: full up to 32 blocks, fading to 10 % at ~200 blocks, never below
  * 10 % regardless of distance.
  */
-public class HideAndSeekGame extends Minigame {
+public class JallupolloGame extends Minigame {
     private final NamespacedKey potionKey;
     private final NamespacedKey compassKey;
     private final Map<UUID, Integer> scores = new HashMap<>();
@@ -74,13 +57,13 @@ public class HideAndSeekGame extends Minigame {
     private Location lastKnownHiderLocation;
 
     private BukkitTask gameTick;
-    private final HideAndSeekListener listener;
+    private final JallupolloListener listener;
 
-    public HideAndSeekGame(TiteeniPlugin plugin, List<Player> players) {
+    public JallupolloGame(TiteeniPlugin plugin, List<Player> players) {
         super(plugin, players);
-        this.potionKey  = new NamespacedKey(plugin, "hidenseek_potion");
-        this.compassKey = new NamespacedKey(plugin, "hidenseek_compass");
-        this.listener   = new HideAndSeekListener(plugin, this);
+        this.potionKey  = new NamespacedKey(plugin, "jallupollo_potion");
+        this.compassKey = new NamespacedKey(plugin, "jallupollo_compass");
+        this.listener   = new JallupolloListener(plugin, this);
         for (Player p : players) scores.put(p.getUniqueId(), 0);
     }
 
@@ -88,7 +71,7 @@ public class HideAndSeekGame extends Minigame {
     // Lifecycle
     // =========================================================================
 
-    @Override public String getDisplayName() { return "Hide and Seek"; }
+    @Override public String getDisplayName() { return "Jallupöllö"; }
 
     @Override
     public void start() {
@@ -98,9 +81,9 @@ public class HideAndSeekGame extends Minigame {
         chooseNewHider(players.get(rng.nextInt(players.size())));
 
         gameTick = plugin.getServer().getScheduler().runTaskTimer(
-                plugin, this::tick, 0L, HideAndSeekConfig.TICK_INTERVAL_TICKS);
+                plugin, this::tick, 0L, JallupolloConfig.TICK_INTERVAL_TICKS);
 
-        broadcast(Component.text("Hide and Seek has started!", NamedTextColor.GOLD));
+        broadcast(Component.text("Jallupöllö has started!", NamedTextColor.GOLD));
     }
 
     @Override
@@ -110,16 +93,16 @@ public class HideAndSeekGame extends Minigame {
         if (gameTick != null) { gameTick.cancel(); gameTick = null; }
         org.bukkit.event.HandlerList.unregisterAll(listener);
 
-        // Clear every player's waypoint and compass so nothing lingers after the game
+        // Clear every player's compass so nothing lingers after the game
         stunnedPlayers.clear();
         for (Player p : getOnlinePlayers()) {
             removeCompass(p);
             p.setCompassTarget(p.getWorld().getSpawnLocation());
         }
-        if (hider != null && hider.isOnline()) removeHiderPotion(hider);
+        if (hider != null && hider.isOnline()) removeJaloviina(hider);
 
         broadcastScores();
-        broadcast(Component.text("Hide and Seek has ended!", NamedTextColor.GOLD));
+        broadcast(Component.text("Jallupöllö has ended!", NamedTextColor.GOLD));
     }
 
     @Override
@@ -151,11 +134,11 @@ public class HideAndSeekGame extends Minigame {
 
         // With a 3600 s consume time there is no cancel/restart gap.
         // isHandRaised() is simply true while the player holds right-click.
-        boolean handRaised = hider.isHandRaised() && isHiderPotion(hider.getActiveItem());
+        boolean handRaised = hider.isHandRaised() && isJaloviina(hider.getActiveItem());
 
         if (handRaised) {
             stopGraceCounter = 0;
-            drinkTicks += HideAndSeekConfig.TICK_INTERVAL_TICKS;
+            drinkTicks += JallupolloConfig.TICK_INTERVAL_TICKS;
 
             if (!isDrinking) {
                 isDrinking = true;
@@ -164,9 +147,9 @@ public class HideAndSeekGame extends Minigame {
 
             // Every 20 ticks = 1 second
             if (drinkTicks % 20 == 0) {
-                scores.merge(hider.getUniqueId(), HideAndSeekConfig.POINTS_PER_SECOND, Integer::sum);
+                scores.merge(hider.getUniqueId(), JallupolloConfig.POINTS_PER_SECOND, Integer::sum);
                 hider.sendActionBar(Component.text(
-                        "+" + HideAndSeekConfig.POINTS_PER_SECOND + " pt  |  Total: "
+                        "+" + JallupolloConfig.POINTS_PER_SECOND + " pt  |  Total: "
                                 + scores.get(hider.getUniqueId()), NamedTextColor.GREEN));
 
                 playRevealSound();
@@ -174,7 +157,7 @@ public class HideAndSeekGame extends Minigame {
 
         } else if (isDrinking) {
             stopGraceCounter++;
-            if (stopGraceCounter >= HideAndSeekConfig.STOP_DRINK_GRACE_CHECKS) {
+            if (stopGraceCounter >= JallupolloConfig.STOP_DRINK_GRACE_CHECKS) {
                 isDrinking = false;
                 drinkTicks = 0;
                 stopGraceCounter = 0;
@@ -227,7 +210,7 @@ public class HideAndSeekGame extends Minigame {
             double dist = seeker.getLocation().distance(hiderLoc);
             float srcVolume = computeSourceVolume((float) dist);
             seeker.playSound(hiderLoc, Sound.ENTITY_GENERIC_DRINK,
-                    SoundCategory.PLAYERS, srcVolume, HideAndSeekConfig.SOUND_PITCH);
+                    SoundCategory.PLAYERS, srcVolume, JallupolloConfig.SOUND_PITCH);
         }
     }
 
@@ -237,13 +220,13 @@ public class HideAndSeekGame extends Minigame {
      */
     private static float computeSourceVolume(float dist) {
         float desired;
-        if (dist <= HideAndSeekConfig.SOUND_FULL_RANGE) {
+        if (dist <= JallupolloConfig.SOUND_FULL_RANGE) {
             desired = 1.0f;
         } else {
-            float t = (dist - HideAndSeekConfig.SOUND_FULL_RANGE)
-                    / (HideAndSeekConfig.SOUND_FADE_END - HideAndSeekConfig.SOUND_FULL_RANGE);
-            desired = Math.max(HideAndSeekConfig.SOUND_MIN_VOLUME,
-                    1.0f - t * (1.0f - HideAndSeekConfig.SOUND_MIN_VOLUME));
+            float t = (dist - JallupolloConfig.SOUND_FULL_RANGE)
+                    / (JallupolloConfig.SOUND_FADE_END - JallupolloConfig.SOUND_FULL_RANGE);
+            desired = Math.max(JallupolloConfig.SOUND_MIN_VOLUME,
+                    1.0f - t * (1.0f - JallupolloConfig.SOUND_MIN_VOLUME));
         }
 
         if (desired >= 1.0f || dist <= 1f) {
@@ -266,16 +249,16 @@ public class HideAndSeekGame extends Minigame {
 
         for (Player p : getOnlinePlayers()) {
             if (p.equals(attacker)) continue;
-            if (p.getLocation().distance(caughtHider.getLocation()) <= HideAndSeekConfig.NEARBY_EFFECT_RADIUS) {
+            if (p.getLocation().distance(caughtHider.getLocation()) <= JallupolloConfig.NEARBY_EFFECT_RADIUS) {
                 p.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS,
-                        HideAndSeekConfig.DEBUFF_DURATION_TICKS, 0, false, true, true));
+                        JallupolloConfig.DEBUFF_DURATION_TICKS, 0, false, true, true));
                 p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
-                        HideAndSeekConfig.DEBUFF_DURATION_TICKS,
-                        HideAndSeekConfig.SLOWNESS_AMPLIFIER, false, true, true));
+                        JallupolloConfig.DEBUFF_DURATION_TICKS,
+                        JallupolloConfig.SLOWNESS_AMPLIFIER, false, true, true));
                 UUID stunId = p.getUniqueId();
                 stunnedPlayers.add(stunId);
                 plugin.getServer().getScheduler().runTaskLater(plugin,
-                        () -> stunnedPlayers.remove(stunId), HideAndSeekConfig.DEBUFF_DURATION_TICKS);
+                        () -> stunnedPlayers.remove(stunId), JallupolloConfig.DEBUFF_DURATION_TICKS);
             }
         }
 
@@ -291,7 +274,7 @@ public class HideAndSeekGame extends Minigame {
 
     public void chooseNewHider(Player newHider) {
         if (hider != null && hider.isOnline()) {
-            removeHiderPotion(hider);
+            removeJaloviina(hider);
             hider.sendMessage(Component.text("You are no longer the hider.", NamedTextColor.YELLOW));
         }
 
@@ -302,7 +285,7 @@ public class HideAndSeekGame extends Minigame {
 
         hider = newHider;
         removeCompass(hider);
-        hider.getInventory().addItem(createHiderPotion());
+        hider.getInventory().addItem(createJaloviina());
 
         // Remove old compasses and redistribute with the new hider name
         for (Player p : getOnlinePlayers()) removeCompass(p);
@@ -314,47 +297,47 @@ public class HideAndSeekGame extends Minigame {
         }
 
         newHider.sendMessage(Component.text(
-                "You are the hider! Find a spot, then hold right-click on the potion to score points.",
+                "You are the pöllö! Find a spot, then hold right-click on the Jaloviina to score points.",
                 NamedTextColor.GREEN));
         newHider.sendMessage(Component.text(
-                "Your Locator Bar waypoint is visible to seekers while you drink — release to hide it!",
+                "Your location is visible to the seekers while you drink — release to hide it!",
                 NamedTextColor.YELLOW));
         broadcast(Component.text(newHider.getName(), NamedTextColor.RED)
-                .append(Component.text(" is now the hider!", NamedTextColor.GOLD)));
+                .append(Component.text(" is now the pöllö!", NamedTextColor.GOLD)));
     }
 
     // =========================================================================
     // Potion helpers
     // =========================================================================
 
-    ItemStack createHiderPotion() {
+    ItemStack createJaloviina() {
         ItemStack potion = new ItemStack(Material.POTION);
 
         // Override the consume duration so the animation runs continuously
         // without ever "completing" during a normal game session.
         PotionMeta meta = (PotionMeta) potion.getItemMeta();
-        meta.displayName(Component.text("Reveal Potion", NamedTextColor.LIGHT_PURPLE)
+        meta.displayName(Component.text("Jaloviina", NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false)
                 .decoration(TextDecoration.BOLD, true));
         meta.lore(List.of(
                 Component.text("Hold right-click to drink and score points", NamedTextColor.GREEN)
                         .decoration(TextDecoration.ITALIC, false),
-                Component.text("Your location is shown on seekers' compass while drinking!", NamedTextColor.GRAY)
+                Component.text("Your location is revealed to all seekers while drinking!", NamedTextColor.GRAY)
                         .decoration(TextDecoration.ITALIC, false)));
-        meta.setColor(Color.fromRGB(0x9B, 0x59, 0xB6));
+        meta.setColor(Color.fromRGB(0x85, 0x46, 0x1E));
         meta.getPersistentDataContainer().set(potionKey, PersistentDataType.BYTE, (byte) 1);
         potion.setItemMeta(meta);
         return potion;
     }
 
-    private void removeHiderPotion(Player player) {
+    private void removeJaloviina(Player player) {
         ItemStack[] contents = player.getInventory().getContents();
         for (int i = 0; i < contents.length; i++) {
-            if (isHiderPotion(contents[i])) player.getInventory().setItem(i, null);
+            if (isJaloviina(contents[i])) player.getInventory().setItem(i, null);
         }
     }
 
-    public boolean isHiderPotion(ItemStack item) {
+    public boolean isJaloviina(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
         return item.getItemMeta().getPersistentDataContainer().has(potionKey, PersistentDataType.BYTE);
     }
@@ -376,7 +359,7 @@ public class HideAndSeekGame extends Minigame {
     ItemStack createSeekerCompass(Player hider) {
         ItemStack compass = new ItemStack(Material.COMPASS);
         ItemMeta meta = compass.getItemMeta();
-        meta.displayName(Component.text("Hider Compass", NamedTextColor.AQUA)
+        meta.displayName(Component.text("Pöllö tracker", NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false)
                 .decoration(TextDecoration.BOLD, true));
         meta.lore(List.of(

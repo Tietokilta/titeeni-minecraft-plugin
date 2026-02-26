@@ -3,7 +3,7 @@ package me.guild.titeenit.command;
 import me.guild.titeenit.TiteeniPlugin;
 import me.guild.titeenit.manager.MinigameManager;
 import me.guild.titeenit.minigame.Minigame;
-import me.guild.titeenit.minigame.hidenseek.HideAndSeekGame;
+import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
@@ -33,7 +33,7 @@ import java.util.UUID;
  */
 public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> GAME_TYPES = List.of("hidenseek");
+    private static final List<String> GAME_TYPES = List.of("jallupollo");
     private static final List<String> SUB_COMMANDS = List.of("start", "stop", "score", "sethider");
 
     private final TiteeniPlugin plugin;
@@ -101,14 +101,14 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         List<Player> online = new ArrayList<>(plugin.getServer().getOnlinePlayers());
 
         switch (gameType.toLowerCase()) {
-            case "hidenseek", "hs" -> {
+            case "jallupollo", "jp" -> {
                 if (online.size() < 2) {
                     sender.sendMessage(Component.text("At least 2 players must be online.", NamedTextColor.RED));
                     return;
                 }
-                manager.startGame(new HideAndSeekGame(plugin, online));
+                manager.startGame(new JallupolloGame(plugin, online));
                 sender.sendMessage(Component.text(
-                        "Starting Hide and Seek with " + online.size() + " players!",
+                        "Starting Jallupöllö with " + online.size() + " players!",
                         NamedTextColor.GREEN
                 ));
             }
@@ -152,8 +152,8 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleSetHider(CommandSender sender, String playerName) {
-        if (!(manager.getCurrentGame() instanceof HideAndSeekGame game)) {
-            sender.sendMessage(Component.text("No Hide and Seek game is currently running.", NamedTextColor.RED));
+        if (!(manager.getCurrentGame() instanceof JallupolloGame game)) {
+            sender.sendMessage(Component.text("No Jallupöllö game is currently running.", NamedTextColor.RED));
             return;
         }
 
@@ -176,7 +176,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/titeeni start <game>       - Start a minigame", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni stop               - Stop the current game", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni score              - Show current scores", NamedTextColor.YELLOW));
-        sender.sendMessage(Component.text("/titeeni sethider <player>  - Manually set the hider (hidenseek)", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni sethider <player>  - Manually set the hider (jallupöllö)", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("Available games: " + String.join(", ", GAME_TYPES), NamedTextColor.GRAY));
     }
 

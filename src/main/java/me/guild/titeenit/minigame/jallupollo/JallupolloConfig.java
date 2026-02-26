@@ -1,11 +1,11 @@
-package me.guild.titeenit.minigame.hidenseek;
+package me.guild.titeenit.minigame.jallupollo;
 
 /**
- * Tunable constants for Hide and Seek.
+ * Tunable constants for Jallupöllö
  */
-public final class HideAndSeekConfig {
+public final class JallupolloConfig {
 
-    private HideAndSeekConfig() {}
+    private JallupolloConfig() {}
 
     // -------------------------------------------------------------------------
     // Drinking
@@ -16,13 +16,6 @@ public final class HideAndSeekConfig {
 
     /** How often the game tick runs, in ticks. */
     public static final long TICK_INTERVAL_TICKS = 5L;
-
-    /**
-     * Consume duration set on the Reveal Potion via the DataComponent API.
-     * We set this to a standard duration (1.6s) so the animation plays normally.
-     * The consume event is cancelled to allow looping.
-     */
-    public static final float POTION_CONSUME_SECONDS = 1.6f;
 
     /**
      * Consecutive non-drinking game-tick checks before the drinking session is
