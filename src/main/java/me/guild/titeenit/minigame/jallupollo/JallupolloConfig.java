@@ -56,7 +56,6 @@ public final class JallupolloConfig {
     public static final double NEARBY_EFFECT_RADIUS = 20.0;
 
     // 20 ticks per second
-    public static final int DEBUFF_DURATION_TICKS = 20 * 10;
-    public static final int SLOWNESS_TICKS     = 20 * 10;
+    public static final int DEBUFF_DURATION_TICKS = 20 * 15;
     public static final int SLOWNESS_AMPLIFIER = 4;
 }
