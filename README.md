@@ -6,11 +6,12 @@ Paper plugin for the Titeenien Taisto Minecraft event. Manages minigames for up 
 
 - Paper 1.21.11+
 - Java 21
+- Maven
 
 ## Build
 
 ```sh
-nix develop --command mvn package -q
+mvn package -q
 ```
 
 Output: `target/TiteeniPlugin-1.0.0.jar`
