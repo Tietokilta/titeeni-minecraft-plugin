@@ -1,0 +1,16 @@
+name: TiteeniPlugin
+version: '1.0.0'
+main: me.guild.titeenit.TiteeniPlugin
+api-version: '1.21.11'
+description: Titeeni minigame plugin
+
+commands:
+  titeeni:
+    description: Titeeni minecraft event management commands
+    usage: /titeeni <start|stop|score|sethider>
+    permission: titeeni.admin
+
+permissions:
+  titeeni.admin:
+    description: Allows management of Titeeni minecraft event minigames
+    default: op
