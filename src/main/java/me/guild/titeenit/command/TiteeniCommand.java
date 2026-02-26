@@ -3,6 +3,7 @@ package me.guild.titeenit.command;
 import me.guild.titeenit.TiteeniPlugin;
 import me.guild.titeenit.manager.MinigameManager;
 import me.guild.titeenit.minigame.Minigame;
+import me.guild.titeenit.minigame.findthebutton.FindTheButtonGame;
 import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -33,7 +34,7 @@ import java.util.UUID;
  */
 public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> GAME_TYPES = List.of("jallupollo");
+    private static final List<String> GAME_TYPES = List.of("jallupollo", "findthebutton");
     private static final List<String> SUB_COMMANDS = List.of("start", "stop", "score", "sethider");
 
     private final TiteeniPlugin plugin;
@@ -109,6 +110,13 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                 manager.startGame(new JallupolloGame(plugin, online));
                 sender.sendMessage(Component.text(
                         "Starting Jallupöllö with " + online.size() + " players!",
+                        NamedTextColor.GREEN
+                ));
+            }
+            case "findthebutton", "ftb" -> {
+                manager.startGame(new FindTheButtonGame(plugin, online));
+                sender.sendMessage(Component.text(
+                        "Starting Find the Button with " + online.size() + " players!",
                         NamedTextColor.GREEN
                 ));
             }
