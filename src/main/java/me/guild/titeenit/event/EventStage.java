@@ -4,13 +4,13 @@ import java.util.Optional;
 
 public enum EventStage {
     AINOA("Ainoa (Tapiola)", "timedrace"),
-    LAHTI("Lahti", "kingofthehill"),
-    LAPPEENRANTA("Lappeenranta", "copythebuild"),
-    JYVASKYLA("Jyväskylä", "findthebutton"),
-    OULU("Oulu", null),
-    VAASA("Vaasa", null),
-    TAMPERE("Tampere", "timedrace"),
     TURKU("Turku", "timedrace"),
+    TAMPERE("Tampere", "timedrace"),
+    VAASA("Vaasa", null),
+    OULU("Oulu", null),
+    JYVASKYLA("Jyväskylä", "findthebutton"),
+    LAPPEENRANTA("Lappeenranta", "copythebuild"),
+    LAHTI("Lahti", "kingofthehill"),
     OTANIEMI("Otaniemi", "jallupollo");
 
     private final String displayName;

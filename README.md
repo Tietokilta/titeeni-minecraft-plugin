@@ -23,13 +23,13 @@ The event follows nine Finnish university cities in order. Players travel betwee
 | # | City | Activity | Scoring |
 |---|---|---|---|
 | 1 | Ainoa (Tapiola) | Maze escape | Timed race |
-| 2 | Lahti | King of the Hill | Points scored on hill |
-| 3 | Lappeenranta | Copy the Build | Builds completed |
-| 4 | Jyväskylä | Find the Button | Buttons found |
+| 2 | Turku | Ice boating race | Timed race |
+| 3 | Tampere | Parkour | Timed race |
+| 4 | Vaasa | Deliver packages | — (no plugin) |
 | 5 | Oulu | Kill a wither | — (no plugin) |
-| 6 | Vaasa | Deliver packages | — (no plugin) |
-| 7 | Tampere | Parkour | Timed race |
-| 8 | Turku | Ice boating race | Timed race |
+| 6 | Jyväskylä | Find the Button | Buttons found |
+| 7 | Lappeenranta | Copy the Build | Builds completed |
+| 8 | Lahti | King of the Hill | Points scored on hill |
 | 9 | Otaniemi | Jallupöllö | Points scored as hider |
 
 ### Event scoring
