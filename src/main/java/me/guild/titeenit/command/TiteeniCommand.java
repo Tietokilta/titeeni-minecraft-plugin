@@ -3,11 +3,14 @@ package me.guild.titeenit.command;
 import me.guild.titeenit.TiteeniPlugin;
 import me.guild.titeenit.manager.MinigameManager;
 import me.guild.titeenit.minigame.Minigame;
+import me.guild.titeenit.minigame.copythebuild.CopyTheBuildConfig;
+import me.guild.titeenit.minigame.copythebuild.CopyTheBuildGame;
 import me.guild.titeenit.minigame.findthebutton.FindTheButtonGame;
 import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
 import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillGame;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -15,6 +18,9 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,11 +41,15 @@ import java.util.UUID;
  */
 public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> GAME_TYPES = List.of("jallupollo", "findthebutton", "kingofthehill");
-    private static final List<String> SUB_COMMANDS = List.of("start", "stop", "score", "sethider");
+    private static final List<String> GAME_TYPES = List.of("jallupollo", "findthebutton", "kingofthehill", "copythebuild");
+    private static final List<String> SUB_COMMANDS = List.of("start", "stop", "score", "sethider", "setplot", "assignplot");
+    private static final List<String> PLOT_TYPES = List.of("model", "build");
 
     private final TiteeniPlugin plugin;
     private final MinigameManager manager;
+
+    /** Pre-game plot assignments for Copy the Build: player UUID → build corner. */
+    private final Map<UUID, Location> plotAssignments = new HashMap<>();
 
     public TiteeniCommand(TiteeniPlugin plugin, MinigameManager manager) {
         this.plugin = plugin;
@@ -81,6 +91,30 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 handleSetHider(sender, args[1]);
+            }
+            case "setplot" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(Component.text(
+                            "Usage: /titeeni setplot <" + String.join("|", PLOT_TYPES) + ">",
+                            NamedTextColor.RED));
+                    return true;
+                }
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
+                    return true;
+                }
+                handleSetPlot(player, args[1]);
+            }
+            case "assignplot" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(Component.text("Usage: /titeeni assignplot <player>", NamedTextColor.RED));
+                    return true;
+                }
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
+                    return true;
+                }
+                handleAssignPlot(player, args[1]);
             }
             default -> sendHelp(sender);
         }
@@ -143,6 +177,29 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                         "Starting King of the Hill with " + online.size() + " players! Hill top: Y=" + hillTopY,
                         NamedTextColor.GREEN));
             }
+            case "copythebuild", "ctb" -> {
+                List<Location> modelPlots = loadPlotLocations("copyTheBuild.modelPlots");
+                List<Location> buildPlots = loadPlotLocations("copyTheBuild.buildPlots");
+                if (modelPlots.isEmpty()) {
+                    sender.sendMessage(Component.text(
+                            "No model plots registered. Use /titeeni setplot model first.",
+                            NamedTextColor.RED));
+                    return;
+                }
+                if (buildPlots.size() < online.size()) {
+                    sender.sendMessage(Component.text(
+                            "Not enough build plots. Need at least " + online.size()
+                                    + ", have " + buildPlots.size()
+                                    + ". Use /titeeni setplot build.",
+                            NamedTextColor.RED));
+                    return;
+                }
+                List<Location> orderedPlots = orderPlotsForPlayers(online, buildPlots);
+                manager.startGame(new CopyTheBuildGame(plugin, online, modelPlots, orderedPlots));
+                sender.sendMessage(Component.text(
+                        "Starting Copy the Build with " + online.size() + " players!",
+                        NamedTextColor.GREEN));
+            }
             default -> sender.sendMessage(Component.text(
                     "Unknown game type: " + gameType + ".  Available: " + String.join(", ", GAME_TYPES),
                     NamedTextColor.RED
@@ -202,12 +259,151 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Set " + target.getName() + " as the hider.", NamedTextColor.GREEN));
     }
 
+    private void handleSetPlot(Player player, String type) {
+        String configKey = switch (type.toLowerCase()) {
+            case "model" -> "copyTheBuild.modelPlots";
+            case "build" -> "copyTheBuild.buildPlots";
+            default -> null;
+        };
+        if (configKey == null) {
+            player.sendMessage(Component.text(
+                    "Unknown plot type: " + type + ". Use: " + String.join(", ", PLOT_TYPES),
+                    NamedTextColor.RED));
+            return;
+        }
+        Location loc = player.getLocation().getBlock().getLocation();
+        saveNewPlotLocation(configKey, loc);
+        int count = loadPlotLocations(configKey).size();
+        player.sendMessage(Component.text(
+                "Saved " + type + " plot at " + formatLoc(loc) + " (" + count + " total)",
+                NamedTextColor.GREEN));
+    }
+
+    /**
+     * Builds an ordered plot list matching the given player list.
+     * Players with an explicit plotAssignment get their corner first;
+     * remaining players fill in from unassigned plots in registered order.
+     */
+    private List<Location> orderPlotsForPlayers(List<Player> players, List<Location> buildPlots) {
+        List<Location> ordered = new ArrayList<>(Collections.nCopies(players.size(), null));
+        List<Location> remaining = new ArrayList<>(buildPlots);
+
+        // First pass: honour explicit assignments
+        for (int i = 0; i < players.size(); i++) {
+            Location assigned = plotAssignments.get(players.get(i).getUniqueId());
+            if (assigned != null && remaining.contains(assigned)) {
+                ordered.set(i, assigned);
+                remaining.remove(assigned);
+            }
+        }
+
+        // Second pass: fill unassigned players from the leftover plots
+        int next = 0;
+        for (int i = 0; i < players.size(); i++) {
+            if (ordered.get(i) == null) {
+                ordered.set(i, remaining.get(next++));
+            }
+        }
+        return ordered;
+    }
+
+    private void handleAssignPlot(Player admin, String targetName) {
+        Player target = plugin.getServer().getPlayer(targetName);
+        if (target == null) {
+            admin.sendMessage(Component.text("Player not found: " + targetName, NamedTextColor.RED));
+            return;
+        }
+
+        List<Location> buildPlots = loadPlotLocations("copyTheBuild.buildPlots");
+        Location matched = null;
+        for (Location corner : buildPlots) {
+            if (isInPlot(admin.getLocation(), corner)) {
+                matched = corner;
+                break;
+            }
+        }
+        if (matched == null) {
+            admin.sendMessage(Component.text(
+                    "You are not standing in a registered build plot.", NamedTextColor.RED));
+            return;
+        }
+
+        // Remove any existing assignment pointing at this corner, then assign to target
+        final Location corner = matched;
+        plotAssignments.values().remove(corner);
+        plotAssignments.put(target.getUniqueId(), corner);
+        admin.sendMessage(Component.text(
+                "Assigned " + target.getName() + " to build plot at " + formatLoc(corner),
+                NamedTextColor.GREEN));
+    }
+
+    private boolean isInPlot(Location loc, Location corner) {
+        if (!loc.getWorld().equals(corner.getWorld())) return false;
+        int size = CopyTheBuildConfig.PLOT_SIZE;
+        int dx = loc.getBlockX() - corner.getBlockX();
+        int dy = loc.getBlockY() - corner.getBlockY();
+        int dz = loc.getBlockZ() - corner.getBlockZ();
+        return dx >= 0 && dx < size && dy >= 0 && dy < size && dz >= 0 && dz < size;
+    }
+
+    private List<Location> loadPlotLocations(String configKey) {
+        List<?> raw = plugin.getConfig().getList(configKey);
+        if (raw == null) return new ArrayList<>();
+        List<Location> locations = new ArrayList<>();
+        for (Object obj : raw) {
+            if (!(obj instanceof Map<?, ?> map)) continue;
+            Object worldName = map.get("world");
+            Object xObj = map.get("x");
+            Object yObj = map.get("y");
+            Object zObj = map.get("z");
+            if (!(worldName instanceof String) || xObj == null || yObj == null || zObj == null) continue;
+            org.bukkit.World world = plugin.getServer().getWorld((String) worldName);
+            if (world == null) continue;
+            locations.add(new Location(world,
+                    ((Number) xObj).doubleValue(),
+                    ((Number) yObj).doubleValue(),
+                    ((Number) zObj).doubleValue()));
+        }
+        return locations;
+    }
+
+    private void saveNewPlotLocation(String configKey, Location loc) {
+        List<Map<String, Object>> existing = new ArrayList<>();
+        List<?> raw = plugin.getConfig().getList(configKey);
+        if (raw != null) {
+            for (Object obj : raw) {
+                if (!(obj instanceof Map<?, ?> map)) continue;
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("world", map.get("world"));
+                entry.put("x", map.get("x"));
+                entry.put("y", map.get("y"));
+                entry.put("z", map.get("z"));
+                existing.add(entry);
+            }
+        }
+        Map<String, Object> newEntry = new LinkedHashMap<>();
+        newEntry.put("world", loc.getWorld().getName());
+        newEntry.put("x", loc.getBlockX());
+        newEntry.put("y", loc.getBlockY());
+        newEntry.put("z", loc.getBlockZ());
+        existing.add(newEntry);
+        plugin.getConfig().set(configKey, existing);
+        plugin.saveConfig();
+    }
+
+    private String formatLoc(Location loc) {
+        return loc.getWorld().getName() + " "
+                + loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ();
+    }
+
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("=== Titeeni Commands ===", NamedTextColor.GOLD));
         sender.sendMessage(Component.text("/titeeni start <game>       - Start a minigame", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni stop               - Stop the current game", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni score              - Show current scores", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni sethider <player>  - Manually set the hider (jallupöllö)", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni setplot <type>     - Register a model/build plot (copythebuild)", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni assignplot <player>- Assign the build plot you're standing in to a player", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("Available games: " + String.join(", ", GAME_TYPES), NamedTextColor.GRAY));
     }
 
@@ -230,9 +426,12 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                 case "start" -> GAME_TYPES.stream()
                         .filter(s -> s.startsWith(args[1].toLowerCase()))
                         .toList();
-                case "sethider" -> plugin.getServer().getOnlinePlayers().stream()
+                case "sethider", "assignplot" -> plugin.getServer().getOnlinePlayers().stream()
                         .map(Player::getName)
                         .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
+                        .toList();
+                case "setplot" -> PLOT_TYPES.stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase()))
                         .toList();
                 default -> List.of();
             };
