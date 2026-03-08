@@ -23,7 +23,6 @@ import java.util.UUID;
 public class CopyTheBuildGame extends Minigame {
 
     private final List<Location> modelPlots;
-    private final List<Location> buildPlots;
 
     private final Map<UUID, Location> playerBuildCorners = new HashMap<>();
     private final Map<UUID, Location> playerPreviewCorners = new HashMap<>();
@@ -39,15 +38,20 @@ public class CopyTheBuildGame extends Minigame {
     private final CopyTheBuildListener listener;
 
     public CopyTheBuildGame(TiteeniPlugin plugin, List<Player> players,
-                             List<Location> modelPlots, List<Location> buildPlots) {
+                             List<Location> modelPlots, Map<UUID, Location> buildPlotsByPlayer) {
         super(plugin, players);
         this.modelPlots = modelPlots;
-        this.buildPlots = buildPlots;
         this.listener = new CopyTheBuildListener(plugin, this);
         this.gameSecondsLeft = CopyTheBuildConfig.GAME_DURATION_SECONDS;
         for (Player p : players) {
             scores.put(p.getUniqueId(), 0);
             playerModelIndex.put(p.getUniqueId(), 0);
+            Location buildCorner = buildPlotsByPlayer.get(p.getUniqueId());
+            if (buildCorner != null) {
+                playerBuildCorners.put(p.getUniqueId(), buildCorner);
+                playerPreviewCorners.put(p.getUniqueId(),
+                        buildCorner.clone().add(0, 0, CopyTheBuildConfig.PREVIEW_OFFSET_Z));
+            }
         }
     }
 
@@ -65,14 +69,7 @@ public class CopyTheBuildGame extends Minigame {
             savedInventories.put(p.getUniqueId(), p.getInventory().getContents().clone());
         }
 
-        // Assign build corners (zip online players with build plots) and derive preview corners
-        for (int i = 0; i < online.size(); i++) {
-            UUID uid = online.get(i).getUniqueId();
-            Location buildCorner = buildPlots.get(i);
-            playerBuildCorners.put(uid, buildCorner);
-            playerPreviewCorners.put(uid, buildCorner.clone().add(0, 0, CopyTheBuildConfig.PREVIEW_OFFSET_Z));
-        }
-
+        // Build/preview corners were already set in the constructor from buildPlotsByPlayer.
         // Save all build and preview plot block states so we can restore on stop
         for (Location corner : playerBuildCorners.values()) {
             saveAreaBlocks(corner, savedBuildStates);

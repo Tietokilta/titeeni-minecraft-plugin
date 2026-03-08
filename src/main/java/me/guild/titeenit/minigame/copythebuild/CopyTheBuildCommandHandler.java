@@ -1,7 +1,9 @@
 package me.guild.titeenit.minigame.copythebuild;
 
+import me.guild.titeenit.Guild;
 import me.guild.titeenit.TiteeniPlugin;
 import me.guild.titeenit.command.MinigameCommandHandler;
+import me.guild.titeenit.event.GuildRegistry;
 import me.guild.titeenit.manager.MinigameManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -10,20 +12,30 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
 
     private static final List<String> PLOT_TYPES = List.of("model", "build");
+    private static final List<String> GUILD_NAMES = Arrays.stream(Guild.values())
+            .map(Guild::name)
+            .map(String::toLowerCase)
+            .toList();
 
     private final TiteeniPlugin plugin;
     private final MinigameManager manager;
+    private final GuildRegistry guildRegistry;
 
-    public CopyTheBuildCommandHandler(TiteeniPlugin plugin, MinigameManager manager) {
+    public CopyTheBuildCommandHandler(TiteeniPlugin plugin, MinigameManager manager,
+                                      GuildRegistry guildRegistry) {
         this.plugin = plugin;
         this.manager = manager;
+        this.guildRegistry = guildRegistry;
     }
 
     @Override
@@ -42,29 +54,31 @@ public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
         }
         if (buildAssignments.isEmpty()) {
             sender.sendMessage(Component.text(
-                    "No build plots registered. Use /titeeni setplot build <player> first.",
+                    "No build plots registered. Use /titeeni setplot build <guild> first.",
                     NamedTextColor.RED));
             return;
         }
 
-        // Include only online players who have an assigned build plot
+        // Match assigned online guild players to their configured build plots
+        Map<UUID, Location> buildPlotsByPlayer = new HashMap<>();
         List<Player> participants = new ArrayList<>();
-        List<Location> orderedPlots = new ArrayList<>();
-        for (Player p : online) {
-            Location corner = buildAssignments.get(p.getName());
-            if (corner != null) {
-                participants.add(p);
-                orderedPlots.add(corner);
-            }
+        for (Guild guild : Guild.values()) {
+            Location corner = buildAssignments.get(guild.name().toLowerCase());
+            if (corner == null) continue;
+            guildRegistry.getPlayer(guild).ifPresent(player -> {
+                buildPlotsByPlayer.put(player.getUniqueId(), corner);
+                participants.add(player);
+            });
         }
+
         if (participants.isEmpty()) {
             sender.sendMessage(Component.text(
-                    "None of the online players have a build plot assigned.",
+                    "None of the assigned guild players are online with a build plot.",
                     NamedTextColor.RED));
             return;
         }
 
-        manager.startGame(new CopyTheBuildGame(plugin, participants, modelPlots, orderedPlots));
+        manager.startGame(new CopyTheBuildGame(plugin, participants, modelPlots, buildPlotsByPlayer));
         sender.sendMessage(Component.text(
                 "Starting Copy the Build with " + participants.size() + " players!",
                 NamedTextColor.GREEN));
@@ -78,7 +92,7 @@ public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
         // args[0] == "setplot"
         if (args.length < 2) {
             sender.sendMessage(Component.text(
-                    "Usage: /titeeni setplot model | setplot build <player>",
+                    "Usage: /titeeni setplot model | setplot build <guild>",
                     NamedTextColor.RED));
             return;
         }
@@ -99,13 +113,20 @@ public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
             case "build" -> {
                 if (args.length < 3) {
                     admin.sendMessage(Component.text(
-                            "Usage: /titeeni setplot build <player>", NamedTextColor.RED));
+                            "Usage: /titeeni setplot build <guild>", NamedTextColor.RED));
+                    return;
+                }
+                Guild guild = Guild.fromString(args[2]).orElse(null);
+                if (guild == null) {
+                    admin.sendMessage(Component.text(
+                            "Unknown guild: " + args[2] + ". Available: " + GUILD_NAMES,
+                            NamedTextColor.RED));
                     return;
                 }
                 Location loc = admin.getLocation().getBlock().getLocation();
-                saveBuildPlot(args[2], loc);
+                saveBuildPlot(guild, loc);
                 admin.sendMessage(Component.text(
-                        "Saved build plot for " + args[2] + " at " + formatLoc(loc),
+                        "Saved build plot for " + guild.getDisplayName() + " at " + formatLoc(loc),
                         NamedTextColor.GREEN));
             }
             default -> sender.sendMessage(Component.text(
@@ -116,18 +137,15 @@ public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
 
     @Override
     public List<String> tabComplete(CommandSender sender, String[] args) {
-        // setplot <type>
         if (args[0].equalsIgnoreCase("setplot")) {
             if (args.length == 2) {
                 return PLOT_TYPES.stream()
                         .filter(s -> s.startsWith(args[1].toLowerCase()))
                         .toList();
             }
-            // setplot build <player>
             if (args.length == 3 && args[1].equalsIgnoreCase("build")) {
-                return plugin.getServer().getOnlinePlayers().stream()
-                        .map(Player::getName)
-                        .filter(n -> n.toLowerCase().startsWith(args[2].toLowerCase()))
+                return GUILD_NAMES.stream()
+                        .filter(n -> n.startsWith(args[2].toLowerCase()))
                         .toList();
             }
         }
@@ -137,8 +155,8 @@ public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
     @Override
     public List<String> getHelpLines() {
         return List.of(
-                "/titeeni setplot model      - Register a model plot corner",
-                "/titeeni setplot build <p>  - Register a build plot corner for player p"
+                "/titeeni setplot model          - Register a model plot corner",
+                "/titeeni setplot build <guild>  - Register a build plot corner for a guild"
         );
     }
 
@@ -146,22 +164,23 @@ public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
     // Config helpers
     // =========================================================================
 
+    /** Loads build plot assignments keyed by lowercase guild name. */
     private Map<String, Location> loadBuildAssignments() {
         List<?> raw = plugin.getConfig().getList("copyTheBuild.buildPlots");
         if (raw == null) return new LinkedHashMap<>();
         Map<String, Location> assignments = new LinkedHashMap<>();
         for (Object obj : raw) {
             if (!(obj instanceof Map<?, ?> map)) continue;
-            Object playerName = map.get("player");
-            Object worldName  = map.get("world");
+            Object guildName = map.get("guild");
+            Object worldName = map.get("world");
             Object xObj = map.get("x");
             Object yObj = map.get("y");
             Object zObj = map.get("z");
-            if (!(playerName instanceof String) || !(worldName instanceof String)
+            if (!(guildName instanceof String) || !(worldName instanceof String)
                     || xObj == null || yObj == null || zObj == null) continue;
             org.bukkit.World world = plugin.getServer().getWorld((String) worldName);
             if (world == null) continue;
-            assignments.put((String) playerName, new Location(world,
+            assignments.put(((String) guildName).toLowerCase(), new Location(world,
                     ((Number) xObj).doubleValue(),
                     ((Number) yObj).doubleValue(),
                     ((Number) zObj).doubleValue()));
@@ -169,16 +188,16 @@ public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
         return assignments;
     }
 
-    private void saveBuildPlot(String playerName, Location loc) {
+    private void saveBuildPlot(Guild guild, Location loc) {
         List<Map<String, Object>> existing = new ArrayList<>();
         List<?> raw = plugin.getConfig().getList("copyTheBuild.buildPlots");
         if (raw != null) {
             for (Object obj : raw) {
                 if (!(obj instanceof Map<?, ?> map)) continue;
-                if (playerName.equalsIgnoreCase(String.valueOf(map.get("player")))) continue;
+                if (guild.name().equalsIgnoreCase(String.valueOf(map.get("guild")))) continue;
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("player", map.get("player"));
-                entry.put("world",  map.get("world"));
+                entry.put("guild", map.get("guild"));
+                entry.put("world", map.get("world"));
                 entry.put("x", map.get("x"));
                 entry.put("y", map.get("y"));
                 entry.put("z", map.get("z"));
@@ -186,8 +205,8 @@ public class CopyTheBuildCommandHandler implements MinigameCommandHandler {
             }
         }
         Map<String, Object> newEntry = new LinkedHashMap<>();
-        newEntry.put("player", playerName);
-        newEntry.put("world",  loc.getWorld().getName());
+        newEntry.put("guild", guild.name());
+        newEntry.put("world", loc.getWorld().getName());
         newEntry.put("x", loc.getBlockX());
         newEntry.put("y", loc.getBlockY());
         newEntry.put("z", loc.getBlockZ());

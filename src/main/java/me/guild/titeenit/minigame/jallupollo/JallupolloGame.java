@@ -7,6 +7,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Color;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
@@ -308,10 +309,6 @@ public class JallupolloGame extends Minigame {
     public boolean isJaloviina(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
         return item.getItemMeta().getPersistentDataContainer().has(potionKey, PersistentDataType.BYTE);
-    }
-
-    private List<Player> getSeekers() {
-        return players.stream().filter(p -> !p.equals(hider)).toList();
     }
 
     public Player getHider() { return hider; }
