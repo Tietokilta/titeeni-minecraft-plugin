@@ -7,14 +7,12 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Color;
-import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
@@ -44,7 +42,6 @@ import java.util.UUID;
  */
 public class JallupolloGame extends Minigame {
     private final NamespacedKey potionKey;
-    private final NamespacedKey compassKey;
     private final Map<UUID, Integer> scores = new HashMap<>();
     private final Set<UUID> stunnedPlayers = new HashSet<>();
     private final Random rng = new Random();
@@ -54,16 +51,14 @@ public class JallupolloGame extends Minigame {
     private boolean isDrinking;
     private int drinkTicks;
     private int stopGraceCounter;
-    private Location lastKnownHiderLocation;
 
     private BukkitTask gameTick;
     private final JallupolloListener listener;
 
     public JallupolloGame(TiteeniPlugin plugin, List<Player> players) {
         super(plugin, players);
-        this.potionKey  = new NamespacedKey(plugin, "jallupollo_potion");
-        this.compassKey = new NamespacedKey(plugin, "jallupollo_compass");
-        this.listener   = new JallupolloListener(plugin, this);
+        this.potionKey = new NamespacedKey(plugin, "jallupollo_potion");
+        this.listener  = new JallupolloListener(plugin, this);
         for (Player p : players) scores.put(p.getUniqueId(), 0);
     }
 
@@ -93,12 +88,7 @@ public class JallupolloGame extends Minigame {
         if (gameTick != null) { gameTick.cancel(); gameTick = null; }
         org.bukkit.event.HandlerList.unregisterAll(listener);
 
-        // Clear every player's compass so nothing lingers after the game
         stunnedPlayers.clear();
-        for (Player p : getOnlinePlayers()) {
-            removeCompass(p);
-            p.setCompassTarget(p.getWorld().getSpawnLocation());
-        }
         if (hider != null && hider.isOnline()) removeJaloviina(hider);
 
         broadcastScores();
@@ -161,7 +151,6 @@ public class JallupolloGame extends Minigame {
                 isDrinking = false;
                 drinkTicks = 0;
                 stopGraceCounter = 0;
-                onDrinkingStopped();
             }
         }
     }
@@ -173,16 +162,6 @@ public class JallupolloGame extends Minigame {
     private void onDrinkingStarted() {
         broadcast(Component.text(hider.getName(), NamedTextColor.RED)
                 .append(Component.text(" is drinking! Navigate to them!", NamedTextColor.YELLOW)));
-    }
-
-    private void onDrinkingStopped() {
-        lastKnownHiderLocation = hider.getLocation().clone();
-        for (Player seeker : getSeekers()) {
-            if (seeker.isOnline()) seeker.setCompassTarget(lastKnownHiderLocation);
-        }
-
-        broadcast(Component.text(hider.getName(), NamedTextColor.RED)
-                .append(Component.text(" stopped drinking. Compass updated!", NamedTextColor.GRAY)));
     }
 
     // =========================================================================
@@ -281,20 +260,9 @@ public class JallupolloGame extends Minigame {
         isDrinking = false;
         drinkTicks = 0;
         stopGraceCounter = 0;
-        lastKnownHiderLocation = null;
 
         hider = newHider;
-        removeCompass(hider);
         hider.getInventory().addItem(createJaloviina());
-
-        // Remove old compasses and redistribute with the new hider name
-        for (Player p : getOnlinePlayers()) removeCompass(p);
-        for (Player seeker : getSeekers()) {
-            if (seeker.isOnline()) {
-                seeker.setCompassTarget(seeker.getWorld().getSpawnLocation());
-                seeker.getInventory().addItem(createSeekerCompass(newHider));
-            }
-        }
 
         newHider.sendMessage(Component.text(
                 "You are the pöllö! Find a spot, then hold right-click on the Jaloviina to score points.",
@@ -352,35 +320,4 @@ public class JallupolloGame extends Minigame {
         return stunnedPlayers.contains(player.getUniqueId());
     }
 
-    // =========================================================================
-    // Compass helpers
-    // =========================================================================
-
-    ItemStack createSeekerCompass(Player hider) {
-        ItemStack compass = new ItemStack(Material.COMPASS);
-        ItemMeta meta = compass.getItemMeta();
-        meta.displayName(Component.text("Pöllö tracker", NamedTextColor.AQUA)
-                .decoration(TextDecoration.ITALIC, false)
-                .decoration(TextDecoration.BOLD, true));
-        meta.lore(List.of(
-                Component.text("Currently tracking: ", NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false)
-                        .append(Component.text(hider.getName(), NamedTextColor.RED)
-                                .decoration(TextDecoration.ITALIC, false))));
-        meta.getPersistentDataContainer().set(compassKey, PersistentDataType.BYTE, (byte) 1);
-        compass.setItemMeta(meta);
-        return compass;
-    }
-
-    public boolean isHiderCompass(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(compassKey, PersistentDataType.BYTE);
-    }
-
-    private void removeCompass(Player player) {
-        ItemStack[] contents = player.getInventory().getContents();
-        for (int i = 0; i < contents.length; i++) {
-            if (isHiderCompass(contents[i])) player.getInventory().setItem(i, null);
-        }
-    }
 }
