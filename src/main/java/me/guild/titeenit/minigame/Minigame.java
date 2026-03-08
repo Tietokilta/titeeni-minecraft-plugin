@@ -56,6 +56,18 @@ public abstract class Minigame {
      */
     public abstract Map<UUID, Integer> getScores();
 
+    /**
+     * Returns true if lower scores are better (e.g., timed races).
+     * Used by EventManager when converting raw scores to ranked event points.
+     */
+    public boolean isLowerScoreBetter() { return false; }
+
+    /**
+     * Called by EventManager when a player boards the bus during this game.
+     * Override in timing-based games to record the player's finish time.
+     */
+    public void onPlayerBoarded(Player player) {}
+
     // -------------------------------------------------------------------------
     // Helpers available to all subclasses
     // -------------------------------------------------------------------------
@@ -78,8 +90,11 @@ public abstract class Minigame {
 
     protected void broadcastScores() {
         broadcast(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
+        var comparator = isLowerScoreBetter()
+                ? Map.Entry.<UUID, Integer>comparingByValue()
+                : Map.Entry.<UUID, Integer>comparingByValue().reversed();
         getScores().entrySet().stream()
-                .sorted(Map.Entry.<UUID, Integer>comparingByValue().reversed())
+                .sorted(comparator)
                 .forEach(entry -> {
                     Player p = plugin.getServer().getPlayer(entry.getKey());
                     String name = p != null ? p.getName() : entry.getKey().toString();

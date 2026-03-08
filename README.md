@@ -1,6 +1,6 @@
 # TiteeniPlugin
 
-Paper plugin for the Titeenien Taisto Minecraft event. Manages minigames for up to 10 players.
+Paper plugin for the Titeenien Taisto Minecraft event. Manages a 9-stage overarching event where 10 players, each representing a Finnish CS guild, compete for points across multiple minigames.
 
 ## Requirements
 
@@ -16,21 +16,191 @@ mvn package -q
 
 Output: `target/TiteeniPlugin-1.0.0.jar`
 
+## Event overview
+
+The event follows nine Finnish university cities in order. Players travel between stages on a shared bus. An admin manually advances the event; minigame stages start automatically on advancement.
+
+| # | City | Activity | Scoring |
+|---|---|---|---|
+| 1 | Ainoa (Tapiola) | Maze escape | Timed race |
+| 2 | Lahti | King of the Hill | Points scored on hill |
+| 3 | Lappeenranta | Copy the Build | Builds completed |
+| 4 | Jyväskylä | Find the Button | Buttons found |
+| 5 | Oulu | Kill a wither | — (no plugin) |
+| 6 | Vaasa | Deliver packages | — (no plugin) |
+| 7 | Tampere | Parkour | Timed race |
+| 8 | Turku | Ice boating race | Timed race |
+| 9 | Otaniemi | Jallupöllö | Points scored as hider |
+
+### Event scoring
+
+After each stage, guilds are ranked by their raw game score and awarded event points:
+
+| Place | Points |
+|---|---|
+| 1st | 12 |
+| 2nd | 10 |
+| 3rd | 8 |
+| 4th | 7 |
+| 5th | 6 |
+| 6th | 5 |
+| 7th | 4 |
+| 8th | 3 |
+| 9th | 2 |
+| 10th | 1 |
+
+For **timed races** (Ainoa, Tampere, Turku), the fastest finisher ranks 1st. Boarding the bus stops a player's individual timer. Players who do not finish receive last place.
+
+The running total is always visible in the **tab list** (player list scoreboard) and via `/titeeni totalscore`.
+
+## Guilds
+
+Each of the 10 guild representatives is assigned via `/titeeni assign`. Only assigned players participate in minigames.
+
+| Constant | Display name |
+|---|---|
+| `TIK` | TiK |
+| `TITE` | TiTe |
+| `DG` | DG |
+| `DIGIT` | Digit |
+| `DATE` | DaTe |
+| `CLUSTER` | Cluster |
+| `SOSA` | SoSa |
+| `TUTTI` | Tutti |
+| `ALGO` | Algo |
+| `OTIT` | OTiT |
+
+## Pre-event setup
+
+All setup commands require op (`titeeni.admin`). Location commands use your current standing position. Everything is saved to `plugins/TiteeniPlugin/config.yml` and persists across restarts.
+
+### 1. Assign guild representatives
+
+```
+/titeeni assign TIK   PlayerName
+/titeeni assign TITE  PlayerName
+...repeat for all 10 guilds...
+```
+
+### 2. Set the bus location
+
+Stand at the spot where players wait between stages and run:
+
+```
+/titeeni setbus
+```
+
+### 3. Set spawn locations per stage and guild
+
+For each stage and each guild, stand at that guild's starting position for that stage and run:
+
+```
+/titeeni setlocation <STAGE> <GUILD>
+```
+
+Stage names (case-insensitive): `AINOA`, `LAHTI`, `LAPPEENRANTA`, `JYVASKYLA`, `OULU`, `VAASA`, `TAMPERE`, `TURKU`, `OTANIEMI`
+
+Example:
+```
+/titeeni setlocation LAHTI TIK
+/titeeni setlocation LAHTI TITE
+...
+```
+
+Timed race stages (Ainoa, Tampere, Turku) start an automatic timer when the stage begins. Oulu, Vaasa are no-plugin stages that still use the configured spawn to teleport players from the bus.
+
+### 4. Configure King of the Hill (Lahti)
+
+```
+/titeeni setkoth <y>
+```
+
+Sets the Y level that counts as "on the hill" for scoring.
+
+### 5. Configure Copy the Build (Lappeenranta)
+
+Register model structures — stand at the north-west-bottom corner of each pre-built 5×5×5 model and run:
+
+```
+/titeeni setplot model
+```
+
+Register each guild's build area — stand at the north-west-bottom corner of their empty 5×5×5 plot and run:
+
+```
+/titeeni setplot build <GUILD>
+```
+
+The game automatically places a **preview plot** 10 blocks behind each build area (+Z: 5 blocks for the plot + 5 block gap). Make sure that space is clear.
+
+### 6. Set up the bus pressure plate
+
+Place a pressure plate at the bus entrance connected to a command block that runs:
+
+```
+/titeeni board <player>
+```
+
+`<player>` should resolve to the player who stepped on the plate (e.g. using a command block with `@p`).
+
+## Running the event
+
+```
+/titeeni advance         ← teleports all bus players to AINOA, no minigame starts
+```
+
+Players complete the current activity, then walk onto the pressure plate to board the bus.
+
+```
+/titeeni advance         ← teleports to LAHTI, King of the Hill starts automatically
+```
+
+The minigame runs until it ends naturally (timer expires) or you stop it manually with `/titeeni stop`. Players then board the bus, and you run `/titeeni advance` again for the next stage.
+
+```
+/titeeni totalscore      ← show accumulated points including the current game
+```
+
 ## Commands
 
 All commands require op (permission `titeeni.admin`).
 
+### Event management
+
 | Command | Description |
 |---|---|
-| `/titeeni start <game>` | Start a minigame |
+| `/titeeni assign <guild> <player>` | Assign an online player to a guild |
+| `/titeeni setlocation <stage> <guild>` | Save your current position as the guild's spawn for a stage |
+| `/titeeni setbus` | Save your current position as the bus location |
+| `/titeeni setkoth <y>` | Set the King of the Hill Y level (Lahti) |
+| `/titeeni advance` | Advance to the next stage — teleports bus players and starts the minigame |
+| `/titeeni board <player>` | Mark a player as on the bus (intended for command block use) |
+| `/titeeni totalscore` | Show accumulated event scores across all completed stages |
+
+### Minigame control
+
+| Command | Description |
+|---|---|
+| `/titeeni start <game>` | Manually start a minigame with guild-assigned players |
 | `/titeeni stop` | Stop the current game |
-| `/titeeni score` | Show current scores |
+| `/titeeni score` | Show scores for the current game |
 | `/titeeni sethider <player>` | Manually set the hider (Jallupöllö only) |
-| `/titeeni setplot model` | Register a model plot corner (Copy the Build only) |
-| `/titeeni setplot build <player>` | Register a build plot corner for a named player (Copy the Build only) |
+| `/titeeni setplot model` | Register a model plot corner (Copy the Build) |
+| `/titeeni setplot build <guild>` | Register a build plot corner for a guild (Copy the Build) |
 
 
 ## Minigames
+
+### Timed Race
+
+Used for Ainoa (maze), Tampere (parkour), and Turku (ice boating). The plugin starts a shared timer when the stage begins. Each player's individual clock stops the moment they board the bus at the finish.
+
+- Your elapsed time is shown in the action bar in real time
+- Once you finish, the action bar shows your final time in green
+- Players who do not finish (disconnect or quit) receive last place
+- The game ends automatically when all participants have finished; otherwise stop it with `/titeeni stop`
+
+These stages start automatically via `/titeeni advance` — no separate `/titeeni start` needed.
 
 ### Jallupöllö
 

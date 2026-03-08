@@ -3,14 +3,14 @@ package me.guild.titeenit.event;
 import java.util.Optional;
 
 public enum EventStage {
-    AINOA("Ainoa (Tapiola)", null),
+    AINOA("Ainoa (Tapiola)", "timedrace"),
     LAHTI("Lahti", "kingofthehill"),
     LAPPEENRANTA("Lappeenranta", "copythebuild"),
     JYVASKYLA("Jyväskylä", "findthebutton"),
     OULU("Oulu", null),
     VAASA("Vaasa", null),
-    TAMPERE("Tampere", null),
-    TURKU("Turku", null),
+    TAMPERE("Tampere", "timedrace"),
+    TURKU("Turku", "timedrace"),
     OTANIEMI("Otaniemi", "jallupollo");
 
     private final String displayName;

@@ -3,17 +3,27 @@ package me.guild.titeenit.event;
 import me.guild.titeenit.Guild;
 import me.guild.titeenit.TiteeniPlugin;
 import me.guild.titeenit.manager.MinigameManager;
+import me.guild.titeenit.minigame.Minigame;
 import me.guild.titeenit.minigame.copythebuild.CopyTheBuildGame;
 import me.guild.titeenit.minigame.findthebutton.FindTheButtonGame;
 import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
 import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillGame;
+import me.guild.titeenit.minigame.timedrace.TimedRaceGame;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.scoreboard.Criteria;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -23,9 +33,16 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Orchestrates the overarching event: stage progression, bus tracking, and cross-game score accumulation.
+ * Orchestrates the overarching event: stage progression, bus tracking,
+ * ranked score accumulation, and the tab-list scoreboard.
  */
-public class EventManager {
+public class EventManager implements Listener {
+
+    /**
+     * Points awarded by finishing rank: index 0 = 1st place, index 1 = 2nd, etc.
+     * Any rank beyond the last entry receives 1 point.
+     */
+    private static final int[] RANK_POINTS = {12, 10, 8, 7, 6, 5, 4, 3, 2, 1};
 
     private final TiteeniPlugin plugin;
     private final MinigameManager minigameManager;
@@ -36,12 +53,25 @@ public class EventManager {
     private final Set<UUID> playersOnBus = new HashSet<>();
     private final Map<UUID, Integer> totalScores = new HashMap<>();
 
+    // Tab-list scoreboard
+    private final Scoreboard scoreboard;
+    private final Objective tabObjective;
+
     public EventManager(TiteeniPlugin plugin, MinigameManager minigameManager,
                         GuildRegistry guildRegistry, EventLocationConfig locationConfig) {
         this.plugin = plugin;
         this.minigameManager = minigameManager;
         this.guildRegistry = guildRegistry;
         this.locationConfig = locationConfig;
+
+        // Set up the persistent tab-list scoreboard
+        scoreboard = plugin.getServer().getScoreboardManager().getNewScoreboard();
+        tabObjective = scoreboard.registerNewObjective(
+                "event_pts", Criteria.DUMMY,
+                Component.text("Event pts", NamedTextColor.GOLD));
+        tabObjective.setDisplaySlot(DisplaySlot.PLAYER_LIST);
+
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
     // -------------------------------------------------------------------------
@@ -49,8 +79,9 @@ public class EventManager {
     // -------------------------------------------------------------------------
 
     /**
-     * Marks the player as on the bus, teleports them to the bus location if configured,
-     * and sends a confirmation message. Intended to be triggered by a command block.
+     * Marks the player as on the bus, teleports them to the bus location,
+     * notifies the active game, and broadcasts a status message.
+     * Intended to be triggered by a command block on a pressure plate.
      */
     public void boardBus(Player player) {
         if (!guildRegistry.isAssigned(player)) {
@@ -59,6 +90,12 @@ public class EventManager {
         }
         playersOnBus.add(player.getUniqueId());
         locationConfig.getBusLocation().ifPresent(player::teleport);
+
+        // Let the active minigame react (e.g. TimedRaceGame records finish time)
+        Minigame currentGame = minigameManager.getCurrentGame();
+        if (currentGame != null) {
+            currentGame.onPlayerBoarded(player);
+        }
 
         Optional<Guild> guild = guildRegistry.getGuild(player);
         String guildName = guild.map(Guild::getDisplayName).orElse("?");
@@ -79,11 +116,10 @@ public class EventManager {
     // -------------------------------------------------------------------------
 
     /**
-     * Advances to the next stage: accumulates scores, stops the current game,
-     * teleports bus players, and auto-starts the next stage's minigame if applicable.
+     * Advances to the next stage: converts current game scores to ranked event
+     * points, stops the game, teleports bus players, and auto-starts the minigame.
      */
     public void advanceStage(CommandSender sender) {
-        // Determine next stage
         EventStage nextStage;
         if (currentStage == null) {
             nextStage = EventStage.AINOA;
@@ -97,10 +133,9 @@ public class EventManager {
             nextStage = next.get();
         }
 
-        // Accumulate scores from running game before stopping it
+        // Convert current game's raw scores to ranked event points before stopping
         if (minigameManager.getCurrentGame() != null) {
-            minigameManager.getCurrentGame().getScores()
-                    .forEach((uuid, pts) -> totalScores.merge(uuid, pts, Integer::sum));
+            accumulateRankedScores(minigameManager.getCurrentGame());
             minigameManager.stopGame();
         }
 
@@ -124,7 +159,6 @@ public class EventManager {
             });
         }
 
-        // Announce the new stage
         broadcastAll(Component.text("══════════════════════════════", NamedTextColor.GOLD));
         broadcastAll(Component.text("  Next stop: " + currentStage.getDisplayName() + "!",
                 NamedTextColor.GOLD));
@@ -133,14 +167,72 @@ public class EventManager {
         sender.sendMessage(Component.text(
                 "Advanced to stage: " + currentStage.getDisplayName(), NamedTextColor.GREEN));
 
-        // Auto-start minigame if this stage has one
         if (currentStage.hasMinigame()) {
             launchMinigame(currentStage, sender);
         }
     }
 
     // -------------------------------------------------------------------------
-    // Scores
+    // Ranked score accumulation
+    // -------------------------------------------------------------------------
+
+    /**
+     * Ranks players by raw game score, awards event points by rank, and
+     * refreshes the tab scoreboard. Ties are broken arbitrarily.
+     * Points: 1st=12, 2nd=10, 3rd=8, 4th=7 … 10th=1.
+     */
+    private void accumulateRankedScores(Minigame game) {
+        Map<UUID, Integer> rawScores = game.getScores();
+        if (rawScores.isEmpty()) return;
+
+        Comparator<Map.Entry<UUID, Integer>> cmp = game.isLowerScoreBetter()
+                ? Map.Entry.comparingByValue()
+                : Map.Entry.<UUID, Integer>comparingByValue().reversed();
+
+        List<UUID> ranked = rawScores.entrySet().stream()
+                .sorted(cmp)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        for (int i = 0; i < ranked.size(); i++) {
+            int pts = i < RANK_POINTS.length ? RANK_POINTS[i] : 1;
+            totalScores.merge(ranked.get(i), pts, Integer::sum);
+        }
+
+        updateScoreboard();
+    }
+
+    // -------------------------------------------------------------------------
+    // Scoreboard
+    // -------------------------------------------------------------------------
+
+    private void updateScoreboard() {
+        for (Map.Entry<UUID, Integer> entry : totalScores.entrySet()) {
+            Player p = plugin.getServer().getPlayer(entry.getKey());
+            if (p == null) continue;
+            tabObjective.getScore(p.getName()).setScore(entry.getValue());
+        }
+        // Ensure all online players see this scoreboard
+        for (Player p : plugin.getServer().getOnlinePlayers()) {
+            if (!p.getScoreboard().equals(scoreboard)) {
+                p.setScoreboard(scoreboard);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player p = event.getPlayer();
+        p.setScoreboard(scoreboard);
+        // Restore their score entry if they already have points
+        Integer score = totalScores.get(p.getUniqueId());
+        if (score != null) {
+            tabObjective.getScore(p.getName()).setScore(score);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Scores (public)
     // -------------------------------------------------------------------------
 
     public Map<UUID, Integer> getTotalScores() {
@@ -167,6 +259,12 @@ public class EventManager {
         }
 
         switch (stage.getMinigameKey()) {
+            case "timedrace" -> {
+                minigameManager.startGame(new TimedRaceGame(plugin, players));
+                sender.sendMessage(Component.text(
+                        "Started Timed Race for " + stage.getDisplayName() + ".",
+                        NamedTextColor.GREEN));
+            }
             case "kingofthehill" -> {
                 double hillTopY = locationConfig.getKothHillY();
                 minigameManager.startGame(new KingOfTheHillGame(plugin, players, hillTopY));
