@@ -261,7 +261,22 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Usage: /titeeni board <player>", NamedTextColor.RED));
             return;
         }
-        Player target = plugin.getServer().getPlayer(args[1]);
+        Player target;
+        if (args[1].startsWith("@")) {
+            try {
+                var entities = plugin.getServer().selectEntities(sender, args[1]);
+                target = entities.stream()
+                        .filter(e -> e instanceof Player)
+                        .map(e -> (Player) e)
+                        .findFirst()
+                        .orElse(null);
+            } catch (IllegalArgumentException e) {
+                sender.sendMessage(Component.text("Invalid selector: " + args[1], NamedTextColor.RED));
+                return;
+            }
+        } else {
+            target = plugin.getServer().getPlayer(args[1]);
+        }
         if (target == null) {
             sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
             return;
