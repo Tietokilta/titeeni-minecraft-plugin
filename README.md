@@ -26,7 +26,6 @@ All commands require op (permission `titeeni.admin`).
 | `/titeeni stop` | Stop the current game |
 | `/titeeni score` | Show current scores |
 | `/titeeni sethider <player>` | Manually set the hider (Jallupöllö only) |
-| `/titeeni setplot <model\|build>` | Register a plot corner (Copy the Build only) |
 
 ## Minigames
 
@@ -48,3 +47,15 @@ Players explore the map and click hidden buttons to score points. First to find 
 - Buttons are restored when the game ends
 
 **Start:** `/titeeni start findthebutton`
+
+### King of the Hill
+
+Players compete to occupy the highest point. PvP is enabled with bare-fist knockback — knock opponents off the hill, then hold the peak to score.
+
+- All players get Knockback I on their fists — no item needed
+- Players at or above the specified Y level score 1 point per second
+- Fall damage is cancelled so getting knocked off is repositioning, not punishment
+- Action bar shows a live top-3 leaderboard and your distance to the hill
+- Game ends after 5 minutes
+
+**Start:** `/titeeni start kingofthehill <y>` (minimum 2 players, e.g. `koth 120`)

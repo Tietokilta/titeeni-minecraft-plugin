@@ -5,6 +5,7 @@ import me.guild.titeenit.manager.MinigameManager;
 import me.guild.titeenit.minigame.Minigame;
 import me.guild.titeenit.minigame.findthebutton.FindTheButtonGame;
 import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
+import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillGame;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
@@ -34,7 +35,7 @@ import java.util.UUID;
  */
 public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> GAME_TYPES = List.of("jallupollo", "findthebutton");
+    private static final List<String> GAME_TYPES = List.of("jallupollo", "findthebutton", "kingofthehill");
     private static final List<String> SUB_COMMANDS = List.of("start", "stop", "score", "sethider");
 
     private final TiteeniPlugin plugin;
@@ -70,7 +71,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                     ));
                     return true;
                 }
-                handleStart(sender, args[1]);
+                handleStart(sender, args);
             }
             case "stop"     -> handleStop(sender);
             case "score"    -> handleScore(sender);
@@ -91,7 +92,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
     // Sub-command handlers
     // =========================================================================
 
-    private void handleStart(CommandSender sender, String gameType) {
+    private void handleStart(CommandSender sender, String[] args) {
         if (manager.getCurrentGame() != null) {
             sender.sendMessage(Component.text(
                     "A game is already running. Use /titeeni stop first.", NamedTextColor.RED
@@ -101,6 +102,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
         List<Player> online = new ArrayList<>(plugin.getServer().getOnlinePlayers());
 
+        String gameType = args[1].toLowerCase();
         switch (gameType.toLowerCase()) {
             case "jallupollo", "jp" -> {
                 if (online.size() < 2) {
@@ -119,6 +121,27 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                         "Starting Find the Button with " + online.size() + " players!",
                         NamedTextColor.GREEN
                 ));
+            }
+            case "kingofthehill", "koth" -> {
+                if (online.size() < 2) {
+                    sender.sendMessage(Component.text("At least 2 players must be online.", NamedTextColor.RED));
+                    return;
+                }
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /titeeni start kingofthehill <y>", NamedTextColor.RED));
+                    return;
+                }
+                double hillTopY;
+                try {
+                    hillTopY = Double.parseDouble(args[2]);
+                } catch (NumberFormatException e) {
+                    sender.sendMessage(Component.text("Invalid Y level: " + args[2], NamedTextColor.RED));
+                    return;
+                }
+                manager.startGame(new KingOfTheHillGame(plugin, online, hillTopY));
+                sender.sendMessage(Component.text(
+                        "Starting King of the Hill with " + online.size() + " players! Hill top: Y=" + hillTopY,
+                        NamedTextColor.GREEN));
             }
             default -> sender.sendMessage(Component.text(
                     "Unknown game type: " + gameType + ".  Available: " + String.join(", ", GAME_TYPES),
