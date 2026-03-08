@@ -3,27 +3,30 @@ package me.guild.titeenit.event;
 import java.util.Optional;
 
 public enum EventStage {
-    AINOA("Ainoa (Tapiola)", "timedrace"),
-    TURKU("Turku", "timedrace"),
-    TAMPERE("Tampere", "timedrace"),
-    VAASA("Vaasa", null),
-    OULU("Oulu", null),
-    JYVASKYLA("Jyväskylä", "findthebutton"),
-    LAPPEENRANTA("Lappeenranta", "copythebuild"),
-    LAHTI("Lahti", "kingofthehill"),
-    OTANIEMI("Otaniemi", "jallupollo");
+    AINOA(   "Ainoa, Tapiola",  "Escape the maze and board the bus",          "timedrace"),
+    TURKU(   "Turku",           "Race to the finish on ice boats",             "timedrace"),
+    TAMPERE( "Tampere",         "Complete the parkour and board the bus",      "timedrace"),
+    VAASA(   "Vaasa",           "Deliver all packages",                        null),
+    OULU(    "Oulu",            "Slay the wither",                             null),
+    JYVASKYLA("Jyväskylä",     "Find the hidden buttons to score",            "findthebutton"),
+    LAPPEENRANTA("Lappeenranta","Replicate the model structure to score",      "copythebuild"),
+    LAHTI(   "Lahti",           "Hold the peak to score",                      "kingofthehill"),
+    OTANIEMI("Otaniemi",        "Find the pöllö — or drink Jaloviina to score","jallupollo");
 
     private final String displayName;
+    private final String subtitle;
     private final String minigameKey;
 
-    EventStage(String displayName, String minigameKey) {
+    EventStage(String displayName, String subtitle, String minigameKey) {
         this.displayName = displayName;
+        this.subtitle = subtitle;
         this.minigameKey = minigameKey;
     }
 
     public String getDisplayName() { return displayName; }
+    public String getSubtitle()    { return subtitle; }
     public String getMinigameKey() { return minigameKey; }
-    public boolean hasMinigame() { return minigameKey != null; }
+    public boolean hasMinigame()   { return minigameKey != null; }
 
     /** Returns the next stage, or empty if this is the last. */
     public Optional<EventStage> next() {

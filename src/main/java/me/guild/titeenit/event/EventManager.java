@@ -11,6 +11,7 @@ import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillGame;
 import me.guild.titeenit.minigame.timedrace.TimedRaceGame;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -22,6 +23,7 @@ import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -163,6 +165,17 @@ public class EventManager implements Listener {
         broadcastAll(Component.text("  Next stop: " + currentStage.getDisplayName() + "!",
                 NamedTextColor.GOLD));
         broadcastAll(Component.text("══════════════════════════════", NamedTextColor.GOLD));
+
+        Title title = Title.title(
+                Component.text(currentStage.getDisplayName(), NamedTextColor.GOLD),
+                Component.text(currentStage.getSubtitle(), NamedTextColor.YELLOW),
+                Title.Times.times(
+                        Duration.ofMillis(500),
+                        Duration.ofSeconds(5),
+                        Duration.ofMillis(1000)));
+        for (Player p : plugin.getServer().getOnlinePlayers()) {
+            p.showTitle(title);
+        }
 
         sender.sendMessage(Component.text(
                 "Advanced to stage: " + currentStage.getDisplayName(), NamedTextColor.GREEN));
