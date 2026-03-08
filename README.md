@@ -26,7 +26,8 @@ All commands require op (permission `titeeni.admin`).
 | `/titeeni stop` | Stop the current game |
 | `/titeeni score` | Show current scores |
 | `/titeeni sethider <player>` | Manually set the hider (Jallupöllö only) |
-| `/titeeni setplot <model\|build>` | Set a model or building plot (Copy the Build only) |
+| `/titeeni setplot model` | Register a model plot corner (Copy the Build only) |
+| `/titeeni setplot build <player>` | Register a build plot corner for a named player (Copy the Build only) |
 
 
 ## Minigames
@@ -80,11 +81,11 @@ Players race to replicate a pre-built 5×5×5 model structure in their own desig
    ```
    Repeat for each additional model (players cycle through them in order).
 
-2. Mark each player's build area. Stand at the **north-west-bottom corner** of an empty 5×5×5 space per player and run:
+2. For each player, stand at the **north-west-bottom corner** of their empty 5×5×5 build area and run:
    ```
-   /titeeni setplot build
+   /titeeni setplot build <player>
    ```
-   You need at least as many build plots as players joining the game.
+   Only players with a registered build plot join the game — running this command is how you control who participates. Re-running it for the same player moves their plot rather than creating a duplicate.
 
    The game automatically places a **preview plot** 10 blocks behind each build area (along the +Z axis: 5 blocks for the plot itself + 5 block gap). The preview shows a live copy of the model the player is currently trying to replicate, updating whenever they complete a build. Make sure that 5×5×5 space is clear of anything you want to keep.
 
