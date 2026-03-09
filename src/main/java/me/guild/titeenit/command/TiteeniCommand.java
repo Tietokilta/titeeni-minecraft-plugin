@@ -207,9 +207,9 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
             return;
         }
-        if (args.length < 3) {
+        if (args.length < 2) {
             sender.sendMessage(Component.text(
-                    "Usage: /titeeni setlocation <stage> <guild>", NamedTextColor.RED));
+                    "Usage: /titeeni setlocation <stage> [guild]", NamedTextColor.RED));
             return;
         }
         EventStage stage = EventStage.fromString(args[1]).orElse(null);
@@ -218,16 +218,25 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                     "Unknown stage: " + args[1] + ". Available: " + STAGE_NAMES, NamedTextColor.RED));
             return;
         }
-        Guild guild = Guild.fromString(args[2]).orElse(null);
-        if (guild == null) {
+        if (args.length >= 3) {
+            Guild guild = Guild.fromString(args[2]).orElse(null);
+            if (guild == null) {
+                sender.sendMessage(Component.text(
+                        "Unknown guild: " + args[2] + ". Available: " + GUILD_NAMES, NamedTextColor.RED));
+                return;
+            }
+            locationConfig.setStageLocation(stage, guild, admin.getLocation());
             sender.sendMessage(Component.text(
-                    "Unknown guild: " + args[2] + ". Available: " + GUILD_NAMES, NamedTextColor.RED));
-            return;
+                    "Set " + stage.getDisplayName() + " spawn for " + guild.getDisplayName()
+                            + " to your current location.", NamedTextColor.GREEN));
+        } else {
+            for (Guild guild : Guild.values()) {
+                locationConfig.setStageLocation(stage, guild, admin.getLocation());
+            }
+            sender.sendMessage(Component.text(
+                    "Set " + stage.getDisplayName() + " spawn for all guilds to your current location.",
+                    NamedTextColor.GREEN));
         }
-        locationConfig.setStageLocation(stage, guild, admin.getLocation());
-        sender.sendMessage(Component.text(
-                "Set " + stage.getDisplayName() + " spawn for " + guild.getDisplayName()
-                        + " to your current location.", NamedTextColor.GREEN));
     }
 
     private void handleSetBus(CommandSender sender) {
@@ -325,7 +334,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/titeeni stop                           - Stop the current game", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni score                          - Show current game scores", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni assign <guild> <player>        - Assign player to guild", NamedTextColor.YELLOW));
-        sender.sendMessage(Component.text("/titeeni setlocation <stage> <guild>    - Set guild spawn for stage", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni setlocation <stage> [guild]    - Set spawn for stage (all guilds if omitted)", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setbus                         - Set bus location", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setkoth <y>                    - Set KOTH hill Y level", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni advance                        - Advance to next stage", NamedTextColor.YELLOW));
