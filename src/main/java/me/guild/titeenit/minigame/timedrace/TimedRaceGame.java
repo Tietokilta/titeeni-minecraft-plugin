@@ -67,7 +67,7 @@ public class TimedRaceGame extends Minigame {
                             "Time: " + formatTime(elapsed), NamedTextColor.YELLOW));
                 }
             }
-        }, 20L, 20L);
+        }, 1L, 1L);
 
         broadcast(Component.text(
                 "Race started! Make your way to the finish as fast as possible!",

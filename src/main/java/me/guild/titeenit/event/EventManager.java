@@ -9,6 +9,7 @@ import me.guild.titeenit.minigame.findthebutton.FindTheButtonGame;
 import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
 import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillGame;
 import me.guild.titeenit.minigame.timedrace.TimedRaceGame;
+import me.guild.titeenit.minigame.timedrace.TurkuRaceGame;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -301,7 +302,12 @@ public class EventManager implements Listener {
 
         switch (stage.getMinigameKey()) {
             case "timedrace" -> {
-                minigameManager.startGame(new TimedRaceGame(plugin, players));
+                if (stage == EventStage.TURKU) {
+                    double gateZ = locationConfig.getTurkuGateZ();
+                    minigameManager.startGame(new TurkuRaceGame(plugin, players, gateZ));
+                } else {
+                    minigameManager.startGame(new TimedRaceGame(plugin, players));
+                }
                 sender.sendMessage(Component.text(
                         "Started Timed Race for " + stage.getDisplayName() + ".",
                         NamedTextColor.GREEN));

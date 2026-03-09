@@ -35,7 +35,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> BASE_SUB_COMMANDS = List.of(
             "start", "stop", "score",
-            "assign", "setlocation", "setbus", "setkoth", "advance", "board", "totalscore"
+            "assign", "setlocation", "setbus", "setkoth", "setturkugate", "advance", "board", "totalscore"
     );
 
     private static final List<String> GUILD_NAMES = Arrays.stream(Guild.values())
@@ -98,8 +98,9 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
             case "assign"     -> handleAssign(sender, args);
             case "setlocation"-> handleSetLocation(sender, args);
             case "setbus"     -> handleSetBus(sender);
-            case "setkoth"    -> handleSetKoth(sender, args);
-            case "advance"    -> eventManager.advanceStage(sender);
+            case "setkoth"       -> handleSetKoth(sender, args);
+            case "setturkugate"  -> handleSetTurkuGate(sender);
+            case "advance"       -> eventManager.advanceStage(sender);
             case "board"      -> handleBoard(sender, args);
             case "totalscore" -> handleTotalScore(sender);
             default -> {
@@ -265,6 +266,18 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                 "King of the Hill Y level set to " + y + ".", NamedTextColor.GREEN));
     }
 
+    private void handleSetTurkuGate(CommandSender sender) {
+        if (!(sender instanceof Player admin)) {
+            sender.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
+            return;
+        }
+        double z = admin.getLocation().getZ();
+        locationConfig.setTurkuGateZ(z);
+        sender.sendMessage(Component.text(
+                "Turku gate Z set to " + z + ". Boats cannot be left before this Z coordinate.",
+                NamedTextColor.GREEN));
+    }
+
     private void handleBoard(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage(Component.text("Usage: /titeeni board <player>", NamedTextColor.RED));
@@ -337,6 +350,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/titeeni setlocation <stage> [guild]    - Set spawn for stage (all guilds if omitted)", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setbus                         - Set bus location", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setkoth <y>                    - Set KOTH hill Y level", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni setturkugate                   - Set Turku boat gate Z (your current Z)", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni advance                        - Advance to next stage", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni board <player>                 - Board a player on the bus", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni totalscore                     - Show accumulated event scores", NamedTextColor.YELLOW));

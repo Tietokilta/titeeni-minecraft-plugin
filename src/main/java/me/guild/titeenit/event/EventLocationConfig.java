@@ -60,6 +60,18 @@ public class EventLocationConfig {
         return plugin.getConfig().getDouble("event.stages.LAHTI.meta.hillTopY", 64.0);
     }
 
+    public void setTurkuGateZ(double z) {
+        plugin.getConfig().set("event.stages.TURKU.meta.gateZ", z);
+        plugin.saveConfig();
+    }
+
+    /** Returns the Z coordinate that the boat must pass before dismounting is allowed.
+     *  Returns {@link Double#NaN} if not configured (gate not enforced). */
+    public double getTurkuGateZ() {
+        if (!plugin.getConfig().contains("event.stages.TURKU.meta.gateZ")) return Double.NaN;
+        return plugin.getConfig().getDouble("event.stages.TURKU.meta.gateZ");
+    }
+
     // -------------------------------------------------------------------------
     // Location serialisation helpers
     // -------------------------------------------------------------------------
