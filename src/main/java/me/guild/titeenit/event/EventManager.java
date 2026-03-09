@@ -52,6 +52,7 @@ public class EventManager implements Listener {
     private final EventLocationConfig locationConfig;
 
     private EventStage currentStage = null;
+    private boolean advancing = false;
     private final Set<UUID> playersOnBus = new HashSet<>();
     private final Map<UUID, Integer> totalScores = new HashMap<>();
 
@@ -118,12 +119,21 @@ public class EventManager implements Listener {
     // -------------------------------------------------------------------------
 
     /**
-     * Advances to the next stage: converts current game scores to ranked event
-     * points, stops the game, teleports bus players, and auto-starts the minigame.
+     * Advances to the next stage:
+     * 1. Scores the current game (ranked event points).
+     * 2. Force-teleports any assigned players who hadn't boarded to the bus.
+     * 3. Shows an "arriving to X" title + chat message for 5 seconds.
+     * 4. After 5 seconds, teleports everyone to their stage spawn and starts the minigame.
      */
     public void advanceStage(CommandSender sender) {
+        if (advancing) {
+            sender.sendMessage(Component.text("Stage transition already in progress.", NamedTextColor.RED));
+            return;
+        }
+
+        boolean isFirstStage = (currentStage == null);
         EventStage nextStage;
-        if (currentStage == null) {
+        if (isFirstStage) {
             nextStage = EventStage.AINOA;
         } else {
             Optional<EventStage> next = currentStage.next();
@@ -135,54 +145,72 @@ public class EventManager implements Listener {
             nextStage = next.get();
         }
 
-        // Convert current game's raw scores to ranked event points before stopping
+        // Score and stop the current game
         if (minigameManager.getCurrentGame() != null) {
             accumulateRankedScores(minigameManager.getCurrentGame());
             minigameManager.stopGame();
         }
 
-        currentStage = nextStage;
-
-        // Teleport bus players to their guild's configured start location
-        List<UUID> boarded = new ArrayList<>(playersOnBus);
-        playersOnBus.clear();
-        for (UUID uuid : boarded) {
-            Player player = plugin.getServer().getPlayer(uuid);
-            if (player == null) continue;
-            guildRegistry.getGuild(player).ifPresent(guild -> {
-                Optional<Location> loc = locationConfig.getStageLocation(currentStage, guild);
-                if (loc.isPresent()) {
-                    player.teleport(loc.get());
-                } else {
-                    player.sendMessage(Component.text(
-                            "No spawn location configured for " + currentStage.getDisplayName()
-                                    + " — staying put.", NamedTextColor.YELLOW));
+        // For stages 2+: force-teleport anyone who didn't board on their own
+        if (!isFirstStage) {
+            for (Player p : guildRegistry.getAssignedOnlinePlayers()) {
+                if (!playersOnBus.contains(p.getUniqueId())) {
+                    playersOnBus.add(p.getUniqueId());
+                    locationConfig.getBusLocation().ifPresent(p::teleport);
+                    p.sendMessage(Component.text(
+                            "You were teleported to the bus.", NamedTextColor.YELLOW));
                 }
-            });
+            }
         }
 
-        broadcastAll(Component.text("══════════════════════════════", NamedTextColor.GOLD));
-        broadcastAll(Component.text("  Next stop: " + currentStage.getDisplayName() + "!",
-                NamedTextColor.GOLD));
-        broadcastAll(Component.text("══════════════════════════════", NamedTextColor.GOLD));
+        currentStage = nextStage;
+        advancing = true;
 
-        Title title = Title.title(
+        // Show "arriving" title to all players for the 5-second bus ride
+        broadcastAll(Component.text(
+                "Arriving to " + currentStage.getDisplayName() + "...", NamedTextColor.AQUA));
+        Title arrivalTitle = Title.title(
                 Component.text(currentStage.getDisplayName(), NamedTextColor.GOLD),
                 Component.text(currentStage.getSubtitle(), NamedTextColor.YELLOW),
                 Title.Times.times(
                         Duration.ofMillis(500),
-                        Duration.ofSeconds(5),
-                        Duration.ofMillis(1000)));
+                        Duration.ofSeconds(9),
+                        Duration.ofMillis(500)));
         for (Player p : plugin.getServer().getOnlinePlayers()) {
-            p.showTitle(title);
+            p.showTitle(arrivalTitle);
         }
-
         sender.sendMessage(Component.text(
-                "Advanced to stage: " + currentStage.getDisplayName(), NamedTextColor.GREEN));
+                "Arriving at " + currentStage.getDisplayName() + " — teleporting in 5 seconds.",
+                NamedTextColor.GREEN));
 
-        if (currentStage.hasMinigame()) {
-            launchMinigame(currentStage, sender);
-        }
+        // Teleport and start minigame after 5 seconds (100 ticks)
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            advancing = false;
+
+            List<UUID> toTeleport = isFirstStage
+                    ? guildRegistry.getAssignedOnlinePlayers().stream().map(Player::getUniqueId).toList()
+                    : new ArrayList<>(playersOnBus);
+            playersOnBus.clear();
+
+            for (UUID uuid : toTeleport) {
+                Player player = plugin.getServer().getPlayer(uuid);
+                if (player == null) continue;
+                guildRegistry.getGuild(player).ifPresent(guild -> {
+                    Optional<Location> loc = locationConfig.getStageLocation(currentStage, guild);
+                    if (loc.isPresent()) {
+                        player.teleport(loc.get());
+                    } else {
+                        player.sendMessage(Component.text(
+                                "No spawn location configured for " + currentStage.getDisplayName()
+                                        + " — staying put.", NamedTextColor.YELLOW));
+                    }
+                });
+            }
+
+            if (currentStage.hasMinigame()) {
+                launchMinigame(currentStage, sender);
+            }
+        }, 100L);
     }
 
     // -------------------------------------------------------------------------
