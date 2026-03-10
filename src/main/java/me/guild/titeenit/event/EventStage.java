@@ -4,7 +4,7 @@ import java.util.Optional;
 
 public enum EventStage {
     AINOA(   "Ainoa, Tapiola",  "Escape the maze",          "timedrace"),
-    TURKU(   "Turku",           "Race to the finish",                         "timedrace"),
+    TURKU(   "Turku",           "Race to the finish",                         "boatrace"),
     TAMPERE( "Tampere",         "Complete the parkour and board the bus",      "timedrace"),
     VAASA(   "Vaasa",           "Deliver all packages",                        null),
     OULU(    "Oulu",            "Slay the wither",                             "timedrace"),

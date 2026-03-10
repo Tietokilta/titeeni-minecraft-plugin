@@ -3,12 +3,14 @@ package me.guild.titeenit.minigame.timedrace;
 import me.guild.titeenit.TiteeniPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Material;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.vehicle.VehicleExitEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
@@ -20,25 +22,17 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Timed race variant for Turku: each participant spawns inside a boat.
- * Dismounting is blocked until the player's Z coordinate exceeds {@code gateZ}
- * (or until they naturally board the finish bus, which skips the gate check).
- *
- * Boats are cleaned up when the game stops or a player quits.
+ * Timed race variant for Turku: each participant receives a hotbar full of boats
+ * at the start. Dismounting from any boat is blocked until the player's Z
+ * coordinate crosses {@code gateZ}.
  */
 public class TurkuRaceGame extends TimedRaceGame implements Listener {
 
-    /** Z threshold that must be reached before dismounting is allowed.
-     *  {@link Double#NaN} means no gate is enforced (allow dismount anywhere). */
     private final double gateZ;
-    /** Set during start() once the race direction is known. */
-    private boolean travelSouth = true;
 
-    /** Boats currently paired with a player (still racing). */
-    private final Map<UUID, Boat> playerBoats = new HashMap<>();
-
-    /** All boats spawned by this game (for clean-up). */
-    private final Set<Boat> allBoats = new HashSet<>();
+    /** Players who have not yet crossed the gate (exit blocked for these). */
+    private final Set<UUID> beforeGate = new HashSet<>();
+    private final Map<UUID, ItemStack[]> savedInventories = new HashMap<>();
 
     private BukkitTask gateTask;
 
@@ -56,48 +50,23 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
         super.start();
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
 
-        List<Player> online = getOnlinePlayers();
-        for (Player p : online) {
-            Boat boat = p.getWorld().spawn(p.getLocation(), Boat.class);
-            playerBoats.put(p.getUniqueId(), boat);
-            allBoats.add(boat);
+        for (Player p : players) {
+            beforeGate.add(p.getUniqueId());
+            savedInventories.put(p.getUniqueId(), p.getInventory().getContents().clone());
+            fillHotbar(p);
         }
 
-        // addPassenger must be deferred — calling it in the same tick as spawn
-        // is silently ignored because the entity hasn't been sent to the client yet.
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            for (Player p : online) {
-                Boat boat = playerBoats.get(p.getUniqueId());
-                if (boat != null && boat.isValid() && p.isOnline()) {
-                    boat.addPassenger(p);
-                }
-            }
-        }, 3L);
-
-        if (!Double.isNaN(gateZ)) {
-            // Determine race direction from where the first player is standing
-            // relative to the gate so the check works whether racers go north or south.
-            travelSouth = online.isEmpty() || online.get(0).getLocation().getZ() < gateZ;
-
+        if (!Double.isNaN(gateZ) && !players.isEmpty()) {
             broadcast(Component.text(
                     "You cannot leave your boat until you reach the finish!",
                     NamedTextColor.YELLOW));
 
             gateTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
-                List<UUID> passed = new ArrayList<>();
-                for (Map.Entry<UUID, Boat> entry : playerBoats.entrySet()) {
-                    Player p = plugin.getServer().getPlayer(entry.getKey());
+                for (UUID uid : new ArrayList<>(beforeGate)) {
+                    Player p = plugin.getServer().getPlayer(uid);
                     if (p == null) continue;
-                    double z = p.getLocation().getZ();
-                    if ((travelSouth && z >= gateZ) || (!travelSouth && z <= gateZ)) {
-                        passed.add(entry.getKey());
-                    }
-                }
-                for (UUID uid : passed) {
-                    Boat boat = playerBoats.remove(uid);
-                    if (boat != null && boat.isValid()) {
-                        boat.eject();
-                        boat.remove();
+                    if (p.getLocation().getZ() >= gateZ) {
+                        beforeGate.remove(uid);
                     }
                 }
             }, 5L, 5L);
@@ -108,11 +77,12 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
     public void stop() {
         if (gateTask != null) { gateTask.cancel(); gateTask = null; }
         HandlerList.unregisterAll(this);
-        for (Boat boat : allBoats) {
-            if (boat.isValid()) boat.remove();
+        for (UUID uid : new ArrayList<>(savedInventories.keySet())) {
+            Player p = plugin.getServer().getPlayer(uid);
+            if (p != null) restoreInventory(p);
         }
-        allBoats.clear();
-        playerBoats.clear();
+        savedInventories.clear();
+        beforeGate.clear();
         super.stop();
     }
 
@@ -120,18 +90,16 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
     // Player events
     // -------------------------------------------------------------------------
 
-    /** Called when a player reaches the finish bus. Remove from tracking so that
-     *  the teleport doesn't get blocked by our VehicleExitEvent handler. */
     @Override
     public void onPlayerBoarded(Player player) {
-        playerBoats.remove(player.getUniqueId());
+        beforeGate.remove(player.getUniqueId());
+        restoreInventory(player);
         super.onPlayerBoarded(player);
     }
 
     @Override
     public void onPlayerQuit(Player player) {
-        Boat boat = playerBoats.remove(player.getUniqueId());
-        if (boat != null && boat.isValid()) boat.remove();
+        beforeGate.remove(player.getUniqueId());
         super.onPlayerQuit(player);
     }
 
@@ -142,22 +110,33 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
     @EventHandler
     public void onVehicleExit(VehicleExitEvent event) {
         if (!(event.getExited() instanceof Player player)) return;
-        UUID uid = player.getUniqueId();
-
-        Boat tracked = playerBoats.get(uid);
-        if (tracked == null) return; // player already finished or not in this game
-        if (!event.getVehicle().equals(tracked)) return; // different vehicle
-
-        // If no gate configured, allow free dismount
+        if (!beforeGate.contains(player.getUniqueId())) return;
+        if (!(event.getVehicle() instanceof Boat)) return;
         if (Double.isNaN(gateZ)) return;
 
-        double z = player.getLocation().getZ();
-        boolean beforeGate = travelSouth ? z < gateZ : z > gateZ;
-        if (beforeGate) {
-            event.setCancelled(true);
-            player.sendMessage(Component.text(
-                    "You cannot leave the boat yet! Reach the finish first.",
-                    NamedTextColor.RED));
+        event.setCancelled(true);
+        player.sendMessage(Component.text(
+                "You cannot leave the boat yet! Reach the finish first.",
+                NamedTextColor.RED));
+    }
+
+    // -------------------------------------------------------------------------
+    // Inventory helpers
+    // -------------------------------------------------------------------------
+
+    private void fillHotbar(Player player) {
+        ItemStack boat = new ItemStack(Material.OAK_BOAT);
+        for (int slot = 0; slot < 9; slot++) {
+            player.getInventory().setItem(slot, boat.clone());
+        }
+        player.updateInventory();
+    }
+
+    private void restoreInventory(Player player) {
+        ItemStack[] saved = savedInventories.remove(player.getUniqueId());
+        if (saved != null) {
+            player.getInventory().setContents(saved);
+            player.updateInventory();
         }
     }
 }

@@ -354,12 +354,11 @@ public class EventManager implements Listener {
 
         switch (stage.getMinigameKey()) {
             case "timedrace" -> {
-                if (stage == EventStage.TURKU) {
-                    double gateZ = locationConfig.getTurkuGateZ();
-                    minigameManager.startGame(new TurkuRaceGame(plugin, players, gateZ));
-                } else {
-                    minigameManager.startGame(new TimedRaceGame(plugin, players));
-                }
+                minigameManager.startGame(new TimedRaceGame(plugin, players));
+            }
+            case "boatrace" -> {
+                double gateZ = locationConfig.getTurkuGateZ();
+                minigameManager.startGame(new TurkuRaceGame(plugin, players, gateZ));
                 sender.sendMessage(Component.text(
                         "Started Timed Race for " + stage.getDisplayName() + ".",
                         NamedTextColor.GREEN));
