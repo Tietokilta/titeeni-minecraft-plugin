@@ -31,6 +31,8 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
     /** Z threshold that must be reached before dismounting is allowed.
      *  {@link Double#NaN} means no gate is enforced (allow dismount anywhere). */
     private final double gateZ;
+    /** Set during start() once the race direction is known. */
+    private boolean travelSouth = true;
 
     /** Boats currently paired with a player (still racing). */
     private final Map<UUID, Boat> playerBoats = new HashMap<>();
@@ -54,24 +56,40 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
         super.start();
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
 
-        for (Player p : getOnlinePlayers()) {
+        List<Player> online = getOnlinePlayers();
+        for (Player p : online) {
             Boat boat = p.getWorld().spawn(p.getLocation(), Boat.class);
-            boat.addPassenger(p);
             playerBoats.put(p.getUniqueId(), boat);
             allBoats.add(boat);
         }
 
+        // addPassenger must be deferred — calling it in the same tick as spawn
+        // is silently ignored because the entity hasn't been sent to the client yet.
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            for (Player p : online) {
+                Boat boat = playerBoats.get(p.getUniqueId());
+                if (boat != null && boat.isValid() && p.isOnline()) {
+                    boat.addPassenger(p);
+                }
+            }
+        }, 3L);
+
         if (!Double.isNaN(gateZ)) {
+            // Determine race direction from where the first player is standing
+            // relative to the gate so the check works whether racers go north or south.
+            travelSouth = online.isEmpty() || online.get(0).getLocation().getZ() < gateZ;
+
             broadcast(Component.text(
-                    "You cannot leave your boat until you reach the bus!",
+                    "You cannot leave your boat until you reach the finish!",
                     NamedTextColor.YELLOW));
 
-            // Every tick: eject and remove the boat for players that cross the gate
             gateTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
                 List<UUID> passed = new ArrayList<>();
                 for (Map.Entry<UUID, Boat> entry : playerBoats.entrySet()) {
                     Player p = plugin.getServer().getPlayer(entry.getKey());
-                    if (p != null && p.getLocation().getZ() >= gateZ) {
+                    if (p == null) continue;
+                    double z = p.getLocation().getZ();
+                    if ((travelSouth && z >= gateZ) || (!travelSouth && z <= gateZ)) {
                         passed.add(entry.getKey());
                     }
                 }
@@ -133,10 +151,12 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
         // If no gate configured, allow free dismount
         if (Double.isNaN(gateZ)) return;
 
-        if (player.getLocation().getZ() < gateZ) {
+        double z = player.getLocation().getZ();
+        boolean beforeGate = travelSouth ? z < gateZ : z > gateZ;
+        if (beforeGate) {
             event.setCancelled(true);
             player.sendMessage(Component.text(
-                    "You cannot leave the boat yet! Reach the bus first.",
+                    "You cannot leave the boat yet! Reach the finish first.",
                     NamedTextColor.RED));
         }
     }

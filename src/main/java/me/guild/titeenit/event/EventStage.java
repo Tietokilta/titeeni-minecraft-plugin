@@ -3,15 +3,15 @@ package me.guild.titeenit.event;
 import java.util.Optional;
 
 public enum EventStage {
-    AINOA(   "Ainoa, Tapiola",  "Escape the maze and board the bus",          "timedrace"),
-    TURKU(   "Turku",           "Race to the finish on ice boats",             "timedrace"),
+    AINOA(   "Ainoa, Tapiola",  "Escape the maze",          "timedrace"),
+    TURKU(   "Turku",           "Race to the finish",                         "timedrace"),
     TAMPERE( "Tampere",         "Complete the parkour and board the bus",      "timedrace"),
     VAASA(   "Vaasa",           "Deliver all packages",                        null),
-    OULU(    "Oulu",            "Slay the wither",                             null),
+    OULU(    "Oulu",            "Slay the wither",                             "timedrace"),
     JYVASKYLA("Jyväskylä",     "Find the hidden buttons to score",            "findthebutton"),
     LAPPEENRANTA("Lappeenranta","Replicate the model structure to score",      "copythebuild"),
-    LAHTI(   "Lahti",           "Hold the peak to score",                      "kingofthehill"),
-    OTANIEMI("Otaniemi",        "Find the pöllö — or drink Jaloviina to score","jallupollo");
+    LAHTI(   "Lahti",           "King of the Hill",                      "kingofthehill"),
+    OTANIEMI("Otaniemi",        "Play jallupöllö","jallupollo");
 
     private final String displayName;
     private final String subtitle;
