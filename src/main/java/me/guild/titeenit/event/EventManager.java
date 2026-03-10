@@ -126,7 +126,17 @@ public class EventManager implements Listener {
      * 3. Shows an "arriving to X" title + chat message for 5 seconds.
      * 4. After 5 seconds, teleports everyone to their stage spawn and starts the minigame.
      */
+    /** Advance to the next sequential stage. */
     public void advanceStage(CommandSender sender) {
+        advanceStage(sender, null);
+    }
+
+    /**
+     * Advance to a specific stage, or to the next sequential stage when
+     * {@code targetStage} is {@code null}. When the last stage is already
+     * complete and no target is given, shows the final leaderboard and resets.
+     */
+    public void advanceStage(CommandSender sender, EventStage targetStage) {
         if (advancing) {
             sender.sendMessage(Component.text("Stage transition already in progress.", NamedTextColor.RED));
             return;
@@ -134,13 +144,24 @@ public class EventManager implements Listener {
 
         boolean isFirstStage = (currentStage == null);
         EventStage nextStage;
-        if (isFirstStage) {
+
+        if (targetStage != null) {
+            nextStage = targetStage;
+        } else if (isFirstStage) {
             nextStage = EventStage.AINOA;
         } else {
             Optional<EventStage> next = currentStage.next();
             if (next.isEmpty()) {
+                // Last stage finished — score final game, show leaderboard, then reset
+                if (minigameManager.getCurrentGame() != null) {
+                    accumulateRankedScores(minigameManager.getCurrentGame());
+                    minigameManager.stopGame();
+                }
+                broadcastFinalLeaderboard();
+                resetState();
                 sender.sendMessage(Component.text(
-                        "The event has already completed all stages!", NamedTextColor.RED));
+                        "Event complete! Scores cleared. Use /titeeni advance to run again.",
+                        NamedTextColor.GREEN));
                 return;
             }
             nextStage = next.get();
@@ -277,6 +298,37 @@ public class EventManager implements Listener {
     // Scores (public)
     // -------------------------------------------------------------------------
 
+    /**
+     * Ends the event immediately without showing a leaderboard. The current game
+     * (if any) is stopped and all state is cleared so the next
+     * {@code /titeeni advance} starts from AINOA.
+     */
+    public void endEvent(CommandSender sender) {
+        if (advancing) {
+            sender.sendMessage(Component.text(
+                    "Cannot end during a stage transition. Wait and try again.",
+                    NamedTextColor.RED));
+            return;
+        }
+        if (minigameManager.getCurrentGame() != null) {
+            minigameManager.stopGame();
+        }
+        resetState();
+        sender.sendMessage(Component.text(
+                "Event ended. Use /titeeni advance to start from AINOA.",
+                NamedTextColor.GREEN));
+    }
+
+    private void resetState() {
+        currentStage = null;
+        advancing = false;
+        playersOnBus.clear();
+        for (String entry : scoreboard.getEntries()) {
+            scoreboard.resetScores(entry);
+        }
+        totalScores.clear();
+    }
+
     public Map<UUID, Integer> getTotalScores() {
         return Map.copyOf(totalScores);
     }
@@ -406,6 +458,35 @@ public class EventManager implements Listener {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private void broadcastFinalLeaderboard() {
+        // Build sorted leaderboard (highest score first)
+        List<Map.Entry<UUID, Integer>> sorted = totalScores.entrySet().stream()
+                .sorted(Map.Entry.<UUID, Integer>comparingByValue().reversed())
+                .toList();
+
+        plugin.getServer().broadcast(Component.text(
+                "═══════════ FINAL RESULTS ═══════════", NamedTextColor.GOLD));
+        for (int i = 0; i < sorted.size(); i++) {
+            UUID uid = sorted.get(i).getKey();
+            int pts = sorted.get(i).getValue();
+            String playerName = plugin.getServer().getOfflinePlayer(uid).getName();
+            if (playerName == null) playerName = uid.toString();
+            String guildName = guildRegistry.getGuild(uid)
+                    .map(Guild::getDisplayName).orElse("?");
+            String place = (i + 1) + ". ";
+            NamedTextColor color = switch (i) {
+                case 0 -> NamedTextColor.GOLD;
+                case 1 -> NamedTextColor.GRAY;
+                case 2 -> NamedTextColor.DARK_RED;
+                default -> NamedTextColor.WHITE;
+            };
+            plugin.getServer().broadcast(Component.text(
+                    place + playerName + " (" + guildName + ") — " + pts + " pts", color));
+        }
+        plugin.getServer().broadcast(Component.text(
+                "═════════════════════════════════════", NamedTextColor.GOLD));
+    }
 
     private void broadcastAll(Component message) {
         plugin.getServer().broadcast(message);

@@ -34,8 +34,8 @@ import java.util.stream.Stream;
 public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> BASE_SUB_COMMANDS = List.of(
-            "start", "stop", "score",
-            "assign", "setlocation", "setbus", "setkoth", "setturkugate", "advance", "board", "totalscore"
+            "score",
+            "assign", "unassign", "setlocation", "setbus", "setkoth", "setturkugate", "advance", "end", "board", "totalscore"
     );
 
     private static final List<String> GUILD_NAMES = Arrays.stream(Guild.values())
@@ -84,25 +84,17 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         }
 
         switch (args[0].toLowerCase()) {
-            case "start"      -> {
-                if (args.length < 2) {
-                    sender.sendMessage(Component.text(
-                            "Usage: /titeeni start <" + primaryGameNamesJoined() + ">",
-                            NamedTextColor.RED));
-                    return true;
-                }
-                handleStart(sender, args);
-            }
-            case "stop"       -> handleStop(sender);
-            case "score"      -> handleScore(sender);
-            case "assign"     -> handleAssign(sender, args);
-            case "setlocation"-> handleSetLocation(sender, args);
-            case "setbus"     -> handleSetBus(sender);
+            case "score"         -> handleScore(sender);
+            case "assign"        -> handleAssign(sender, args);
+            case "unassign"      -> handleUnassign(sender, args);
+            case "setlocation"   -> handleSetLocation(sender, args);
+            case "setbus"        -> handleSetBus(sender);
             case "setkoth"       -> handleSetKoth(sender, args);
             case "setturkugate"  -> handleSetTurkuGate(sender);
-            case "advance"       -> eventManager.advanceStage(sender);
-            case "board"      -> handleBoard(sender, args);
-            case "totalscore" -> handleTotalScore(sender);
+            case "advance"       -> handleAdvance(sender, args);
+            case "end"           -> eventManager.endEvent(sender);
+            case "board"         -> handleBoard(sender, args);
+            case "totalscore"    -> handleTotalScore(sender);
             default -> {
                 String sub = args[0].toLowerCase();
                 for (MinigameCommandHandler handler : handlers) {
@@ -119,38 +111,21 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
     }
 
     // =========================================================================
-    // Minigame sub-command handlers
+    // Event/minigame sub-command handlers
     // =========================================================================
 
-    private void handleStart(CommandSender sender, String[] args) {
-        if (manager.getCurrentGame() != null) {
+    private void handleAdvance(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            eventManager.advanceStage(sender);
+            return;
+        }
+        EventStage target = EventStage.fromString(args[1]).orElse(null);
+        if (target == null) {
             sender.sendMessage(Component.text(
-                    "A game is already running. Use /titeeni stop first.", NamedTextColor.RED));
+                    "Unknown stage: " + args[1] + ". Available: " + STAGE_NAMES, NamedTextColor.RED));
             return;
         }
-
-        List<Player> guildPlayers = guildRegistry.getAssignedOnlinePlayers();
-        String gameType = args[1].toLowerCase();
-
-        for (MinigameCommandHandler handler : handlers) {
-            if (handler.getGameNames().contains(gameType)) {
-                handler.handleStart(sender, guildPlayers, args);
-                return;
-            }
-        }
-
-        sender.sendMessage(Component.text(
-                "Unknown game type: " + args[1] + ". Available: " + primaryGameNamesJoined(),
-                NamedTextColor.RED));
-    }
-
-    private void handleStop(CommandSender sender) {
-        if (manager.getCurrentGame() == null) {
-            sender.sendMessage(Component.text("No game is currently running.", NamedTextColor.RED));
-            return;
-        }
-        manager.stopGame();
-        sender.sendMessage(Component.text("Game stopped.", NamedTextColor.GREEN));
+        eventManager.advanceStage(sender, target);
     }
 
     private void handleScore(CommandSender sender) {
@@ -201,6 +176,27 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text(
                 "Assigned " + target.getName() + " to " + guild.getDisplayName() + ".",
                 NamedTextColor.GREEN));
+    }
+
+    private void handleUnassign(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /titeeni unassign <player>", NamedTextColor.RED));
+            return;
+        }
+        Player target = plugin.getServer().getPlayer(args[1]);
+        UUID uuid = target != null ? target.getUniqueId() : null;
+        if (uuid == null) {
+            // Accept offline players by name via OfflinePlayer
+            uuid = plugin.getServer().getOfflinePlayer(args[1]).getUniqueId();
+        }
+        List<Guild> removed = guildRegistry.unassignPlayer(uuid);
+        if (removed.isEmpty()) {
+            sender.sendMessage(Component.text(args[1] + " was not assigned to any guild.", NamedTextColor.YELLOW));
+        } else {
+            String guilds = removed.stream().map(Guild::getDisplayName).reduce((a, b) -> a + ", " + b).orElse("");
+            sender.sendMessage(Component.text(
+                    "Unassigned " + args[1] + " from: " + guilds + ".", NamedTextColor.GREEN));
+        }
     }
 
     private void handleSetLocation(CommandSender sender, String[] args) {
@@ -343,23 +339,22 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("=== Titeeni Commands ===", NamedTextColor.GOLD));
-        sender.sendMessage(Component.text("/titeeni start <game>                   - Start a minigame", NamedTextColor.YELLOW));
-        sender.sendMessage(Component.text("/titeeni stop                           - Stop the current game", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni advance [stage]                - Advance to next (or specific) stage", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni end                            - End event early, reset for next run", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni score                          - Show current game scores", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni totalscore                     - Show accumulated event scores", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni board <player>                 - Board a player on the bus", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni assign <guild> <player>        - Assign player to guild", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni unassign <player>              - Remove player from all guilds", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setlocation <stage> [guild]    - Set spawn for stage (all guilds if omitted)", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setbus                         - Set bus location", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setkoth <y>                    - Set KOTH hill Y level", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setturkugate                   - Set Turku boat gate Z (your current Z)", NamedTextColor.YELLOW));
-        sender.sendMessage(Component.text("/titeeni advance                        - Advance to next stage", NamedTextColor.YELLOW));
-        sender.sendMessage(Component.text("/titeeni board <player>                 - Board a player on the bus", NamedTextColor.YELLOW));
-        sender.sendMessage(Component.text("/titeeni totalscore                     - Show accumulated event scores", NamedTextColor.YELLOW));
         for (MinigameCommandHandler handler : handlers) {
             for (String line : handler.getHelpLines()) {
                 sender.sendMessage(Component.text(line, NamedTextColor.YELLOW));
             }
         }
-        sender.sendMessage(Component.text("Available games: " + primaryGameNamesJoined(), NamedTextColor.GRAY));
     }
 
     // =========================================================================
@@ -380,22 +375,9 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase();
 
-        if (sub.equals("start")) {
-            if (args.length == 2) {
-                return handlers.stream()
-                        .flatMap(h -> h.getGameNames().stream())
-                        .filter(s -> s.startsWith(args[1].toLowerCase()))
-                        .toList();
-            }
-            if (args.length >= 3) {
-                String gameType = args[1].toLowerCase();
-                for (MinigameCommandHandler handler : handlers) {
-                    if (handler.getGameNames().contains(gameType)) {
-                        return handler.tabComplete(sender, args);
-                    }
-                }
-            }
-            return List.of();
+        if (sub.equals("advance") && args.length == 2) {
+            return STAGE_NAMES.stream()
+                    .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
         }
 
         if (sub.equals("assign")) {
@@ -409,6 +391,13 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                         .filter(n -> n.toLowerCase().startsWith(args[2].toLowerCase()))
                         .toList();
             }
+        }
+
+        if (sub.equals("unassign") && args.length == 2) {
+            return plugin.getServer().getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
+                    .toList();
         }
 
         if (sub.equals("setlocation")) {
@@ -445,10 +434,4 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
     // Helpers
     // =========================================================================
 
-    private String primaryGameNamesJoined() {
-        return handlers.stream()
-                .map(h -> h.getGameNames().get(0))
-                .reduce((a, b) -> a + ", " + b)
-                .orElse("");
-    }
 }

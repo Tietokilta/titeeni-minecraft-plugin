@@ -41,6 +41,18 @@ public class GuildRegistry {
         plugin.saveConfig();
     }
 
+    /** Removes the player from every guild they are assigned to. Returns the guilds they were removed from. */
+    public List<Guild> unassignPlayer(UUID uuid) {
+        List<Guild> removed = new ArrayList<>();
+        for (Guild guild : Guild.values()) {
+            if (uuid.equals(assignments.get(guild))) {
+                removed.add(guild);
+                unassign(guild);
+            }
+        }
+        return removed;
+    }
+
     // -------------------------------------------------------------------------
     // Lookup
     // -------------------------------------------------------------------------
@@ -55,7 +67,10 @@ public class GuildRegistry {
 
     /** Returns the guild for a given player, if assigned. */
     public Optional<Guild> getGuild(Player player) {
-        UUID uuid = player.getUniqueId();
+        return getGuild(player.getUniqueId());
+    }
+
+    public Optional<Guild> getGuild(UUID uuid) {
         for (Map.Entry<Guild, UUID> entry : assignments.entrySet()) {
             if (entry.getValue().equals(uuid)) return Optional.of(entry.getKey());
         }
