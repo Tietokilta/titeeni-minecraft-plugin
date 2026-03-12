@@ -9,20 +9,23 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.vehicle.VehicleEnterEvent;
 import org.bukkit.event.vehicle.VehicleExitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * Timed race variant for Turku: each participant receives a hotbar full of boats
- * at the start. Dismounting from any boat is blocked until the player's Z
- * coordinate crosses {@code gateZ}.
+ * Timed race variant for Turku: each participant receives one boat at the start.
+ * Dismounting is blocked until the player's Z coordinate crosses {@code gateZ}.
+ * Players may not enter a boat owned by another participant.
  */
 public class TurkuRaceGame extends TimedRaceGame implements Listener {
 
@@ -30,6 +33,9 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
 
     /** Players who have not yet crossed the gate (exit blocked for these). */
     private final Set<UUID> beforeGate = new HashSet<>();
+
+    /** boat entity UUID → owner player UUID, populated on first entry. */
+    private final Map<UUID, UUID> boatOwners = new HashMap<>();
 
     private BukkitTask gateTask;
 
@@ -50,7 +56,7 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
 
         for (Player p : getOnlinePlayers()) {
             beforeGate.add(p.getUniqueId());
-            fillHotbar(p);
+            p.getInventory().addItem(new ItemStack(Material.OAK_BOAT));
         }
 
         if (!Double.isNaN(gateZ) && !players.isEmpty()) {
@@ -75,6 +81,7 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
         if (gateTask != null) { gateTask.cancel(); gateTask = null; }
         HandlerList.unregisterAll(this);
         beforeGate.clear();
+        boatOwners.clear();
         restoreInventories();
         super.stop();
     }
@@ -97,8 +104,25 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
     }
 
     // -------------------------------------------------------------------------
-    // Gate enforcement
+    // Vehicle events
     // -------------------------------------------------------------------------
+
+    @EventHandler
+    public void onVehicleEnter(VehicleEnterEvent event) {
+        if (!(event.getVehicle() instanceof Boat boat)) return;
+        if (!(event.getEntered() instanceof Player player)) return;
+        if (!isParticipant(player)) return;
+
+        UUID boatId   = boat.getUniqueId();
+        UUID playerId = player.getUniqueId();
+
+        UUID owner = boatOwners.get(boatId);
+        if (owner == null) {
+            boatOwners.put(boatId, playerId); // first entry — claim ownership
+        } else if (!owner.equals(playerId)) {
+            event.setCancelled(true);
+        }
+    }
 
     @EventHandler
     public void onVehicleExit(VehicleExitEvent event) {
@@ -111,17 +135,5 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
         player.sendMessage(Component.text(
                 "You cannot leave the boat yet! Reach the finish first.",
                 NamedTextColor.RED));
-    }
-
-    // -------------------------------------------------------------------------
-    // Inventory helpers
-    // -------------------------------------------------------------------------
-
-    private void fillHotbar(Player player) {
-        ItemStack boat = new ItemStack(Material.OAK_BOAT);
-        for (int slot = 0; slot < 9; slot++) {
-            player.getInventory().setItem(slot, boat.clone());
-        }
-        player.updateInventory();
     }
 }
