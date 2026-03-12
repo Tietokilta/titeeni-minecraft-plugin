@@ -35,7 +35,8 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> BASE_SUB_COMMANDS = List.of(
             "score",
-            "assign", "unassign", "setlocation", "setbus", "setkoth", "setturkugate", "advance", "end", "board", "totalscore"
+            "assign", "unassign", "setlocation", "setbus", "setkoth", "setturkugate", "advance", "end", "board", "totalscore",
+            "goto"
     );
 
     private static final List<String> GUILD_NAMES = Arrays.stream(Guild.values())
@@ -95,6 +96,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
             case "end"           -> eventManager.endEvent(sender);
             case "board"         -> handleBoard(sender, args);
             case "totalscore"    -> handleTotalScore(sender);
+            case "goto"          -> handleGoto(sender, args);
             default -> {
                 String sub = args[0].toLowerCase();
                 for (MinigameCommandHandler handler : handlers) {
@@ -302,6 +304,39 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         eventManager.boardBus(target);
     }
 
+    private void handleGoto(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player admin)) {
+            sender.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
+            return;
+        }
+        if (args.length < 3) {
+            sender.sendMessage(Component.text("Usage: /titeeni goto <stage> <guild>", NamedTextColor.RED));
+            return;
+        }
+        EventStage stage = EventStage.fromString(args[1]).orElse(null);
+        if (stage == null) {
+            sender.sendMessage(Component.text(
+                    "Unknown stage: " + args[1] + ". Available: " + STAGE_NAMES, NamedTextColor.RED));
+            return;
+        }
+        Guild guild = Guild.fromString(args[2]).orElse(null);
+        if (guild == null) {
+            sender.sendMessage(Component.text(
+                    "Unknown guild: " + args[2] + ". Available: " + GUILD_NAMES, NamedTextColor.RED));
+            return;
+        }
+        locationConfig.getStageLocation(stage, guild).ifPresentOrElse(
+                loc -> {
+                    admin.teleport(loc);
+                    sender.sendMessage(Component.text(
+                            "Teleported to " + stage.getDisplayName() + " spawn for " + guild.getDisplayName() + ".",
+                            NamedTextColor.GREEN));
+                },
+                () -> sender.sendMessage(Component.text(
+                        "No spawn configured for " + stage.getDisplayName() + " / " + guild.getDisplayName() + ".",
+                        NamedTextColor.RED)));
+    }
+
     private void handleTotalScore(CommandSender sender) {
         Map<UUID, Integer> totals = eventManager.getTotalScores();
 
@@ -350,6 +385,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/titeeni setbus                         - Set bus location", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setkoth <y>                    - Set KOTH hill Y level", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/titeeni setturkugate                   - Set Turku boat gate Z (your current Z)", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("/titeeni goto <stage> <guild>           - Teleport to a guild's spawn in a stage", NamedTextColor.YELLOW));
         for (MinigameCommandHandler handler : handlers) {
             for (String line : handler.getHelpLines()) {
                 sender.sendMessage(Component.text(line, NamedTextColor.YELLOW));
@@ -401,6 +437,17 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
         }
 
         if (sub.equals("setlocation")) {
+            if (args.length == 2) {
+                return STAGE_NAMES.stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
+            }
+            if (args.length == 3) {
+                return GUILD_NAMES.stream()
+                        .filter(g -> g.startsWith(args[2].toLowerCase())).toList();
+            }
+        }
+
+        if (sub.equals("goto")) {
             if (args.length == 2) {
                 return STAGE_NAMES.stream()
                         .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
