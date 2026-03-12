@@ -10,6 +10,8 @@ import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
 import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillGame;
 import me.guild.titeenit.minigame.timedrace.TampereRaceGame;
 import me.guild.titeenit.minigame.tradeup.TradeUpGame;
+import me.guild.titeenit.minigame.shootinggallery.ShootingGalleryCommandHandler;
+import me.guild.titeenit.minigame.shootinggallery.ShootingGalleryGame;
 import me.guild.titeenit.minigame.timedrace.TimedRaceGame;
 import me.guild.titeenit.minigame.timedrace.TurkuRaceGame;
 import net.kyori.adventure.text.Component;
@@ -411,6 +413,11 @@ public class EventManager implements Listener {
             case "findthebutton" -> {
                 minigameManager.startGame(new FindTheButtonGame(plugin, players));
                 sender.sendMessage(Component.text("Started Find the Button.", NamedTextColor.GREEN));
+            }
+            case "shootinggallery" -> {
+                Map<Guild, Location> zombieSpawns = ShootingGalleryCommandHandler.loadZombieSpawns(plugin);
+                minigameManager.startGame(new ShootingGalleryGame(plugin, players, zombieSpawns));
+                sender.sendMessage(Component.text("Started Shooting Gallery.", NamedTextColor.GREEN));
             }
             case "jallupollo" -> {
                 if (players.size() < 2) {

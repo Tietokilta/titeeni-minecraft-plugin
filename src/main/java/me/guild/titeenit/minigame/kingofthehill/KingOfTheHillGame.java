@@ -38,6 +38,9 @@ public class KingOfTheHillGame extends Minigame {
     @Override
     public String getDisplayName() { return "King of the Hill"; }
 
+    @Override
+    public int getTimerSeconds() { return 240; }
+
     // =========================================================================
     // Lifecycle
     // =========================================================================

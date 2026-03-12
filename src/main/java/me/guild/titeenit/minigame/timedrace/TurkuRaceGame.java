@@ -14,10 +14,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -32,7 +30,6 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
 
     /** Players who have not yet crossed the gate (exit blocked for these). */
     private final Set<UUID> beforeGate = new HashSet<>();
-    private final Map<UUID, ItemStack[]> savedInventories = new HashMap<>();
 
     private BukkitTask gateTask;
 
@@ -47,12 +44,12 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
 
     @Override
     public void start() {
+        saveAndClearInventories();
         super.start();
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
 
-        for (Player p : players) {
+        for (Player p : getOnlinePlayers()) {
             beforeGate.add(p.getUniqueId());
-            savedInventories.put(p.getUniqueId(), p.getInventory().getContents().clone());
             fillHotbar(p);
         }
 
@@ -77,12 +74,8 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
     public void stop() {
         if (gateTask != null) { gateTask.cancel(); gateTask = null; }
         HandlerList.unregisterAll(this);
-        for (UUID uid : new ArrayList<>(savedInventories.keySet())) {
-            Player p = plugin.getServer().getPlayer(uid);
-            if (p != null) restoreInventory(p);
-        }
-        savedInventories.clear();
         beforeGate.clear();
+        restoreInventories();
         super.stop();
     }
 
@@ -130,13 +123,5 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
             player.getInventory().setItem(slot, boat.clone());
         }
         player.updateInventory();
-    }
-
-    private void restoreInventory(Player player) {
-        ItemStack[] saved = savedInventories.remove(player.getUniqueId());
-        if (saved != null) {
-            player.getInventory().setContents(saved);
-            player.updateInventory();
-        }
     }
 }

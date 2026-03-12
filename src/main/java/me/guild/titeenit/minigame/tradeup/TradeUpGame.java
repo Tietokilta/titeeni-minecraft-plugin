@@ -69,7 +69,7 @@ public class TradeUpGame extends Minigame {
 
         for (Player p : getOnlinePlayers()) {
             p.getInventory().addItem(new ItemStack(Material.BOOK, 1));
-            p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 2, false, false));
+            p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 4, false, false));
         }
 
         broadcast(Component.text(

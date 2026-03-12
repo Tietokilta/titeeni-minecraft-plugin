@@ -12,6 +12,7 @@ import me.guild.titeenit.minigame.copythebuild.CopyTheBuildCommandHandler;
 import me.guild.titeenit.minigame.findthebutton.FindTheButtonCommandHandler;
 import me.guild.titeenit.minigame.jallupollo.JallupolloCommandHandler;
 import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillCommandHandler;
+import me.guild.titeenit.minigame.shootinggallery.ShootingGalleryCommandHandler;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
@@ -64,7 +65,8 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                 new JallupolloCommandHandler(plugin, manager),
                 new FindTheButtonCommandHandler(plugin, manager),
                 new KingOfTheHillCommandHandler(plugin, manager),
-                new CopyTheBuildCommandHandler(plugin, manager, guildRegistry)
+                new CopyTheBuildCommandHandler(plugin, manager, guildRegistry),
+                new ShootingGalleryCommandHandler(plugin, manager)
         );
     }
 
