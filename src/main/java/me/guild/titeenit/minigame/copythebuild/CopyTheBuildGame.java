@@ -56,6 +56,7 @@ public class CopyTheBuildGame extends Minigame {
 
     @Override
     public String getDisplayName() { return "Copy the Build"; }
+    @Override public int getTimerSeconds() { return 480; }
 
     @Override
     public void start() {

@@ -71,6 +71,7 @@ public class JallupolloGame extends Minigame {
     // =========================================================================
 
     @Override public String getDisplayName() { return "Jallupöllö"; }
+    @Override public int getTimerSeconds() { return 480; }
 
     @Override
     public void start() {

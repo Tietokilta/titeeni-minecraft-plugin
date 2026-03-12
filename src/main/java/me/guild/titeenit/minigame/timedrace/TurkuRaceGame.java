@@ -44,6 +44,8 @@ public class TurkuRaceGame extends TimedRaceGame implements Listener {
         this.gateZ = gateZ;
     }
 
+    @Override public int getTimerSeconds() { return 180; }
+
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
