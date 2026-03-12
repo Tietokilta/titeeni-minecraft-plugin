@@ -4,7 +4,11 @@ import me.guild.titeenit.Guild;
 import me.guild.titeenit.TiteeniPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
 import org.bukkit.entity.Player;
+
+import java.time.Duration;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
@@ -166,6 +170,7 @@ public abstract class Minigame {
     }
 
     protected void broadcastScores() {
+        showTopPerformersTitle();
         broadcast(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
         var comparator = isLowerScoreBetter()
                 ? Map.Entry.<UUID, Integer>comparingByValue()
@@ -175,6 +180,44 @@ public abstract class Minigame {
                 .forEach(entry -> broadcast(Component.text(
                         displayName(entry.getKey()) + ": " + entry.getValue() + " points",
                         NamedTextColor.YELLOW)));
+    }
+
+    /**
+     * Shows a title/subtitle to all online participants with the top 1–3
+     * finishers of this game. Called at the start of broadcastScores().
+     */
+    protected void showTopPerformersTitle() {
+        List<Player> online = getOnlinePlayers();
+        if (online.isEmpty()) return;
+
+        var comparator = isLowerScoreBetter()
+                ? Map.Entry.<UUID, Integer>comparingByValue()
+                : Map.Entry.<UUID, Integer>comparingByValue().reversed();
+
+        List<Map.Entry<UUID, Integer>> top = getScores().entrySet().stream()
+                .sorted(comparator)
+                .limit(3)
+                .toList();
+
+        if (top.isEmpty()) return;
+
+        Component titleText = Component.text(getDisplayName(), NamedTextColor.GOLD, TextDecoration.BOLD);
+
+        // Place colours: gold / gray / dark_red  (mirrors the final leaderboard)
+        NamedTextColor[] placeColors = {NamedTextColor.GOLD, NamedTextColor.GRAY, NamedTextColor.DARK_RED};
+        String[] placeLabels = {"1.", "2.", "3."};
+
+        Component subtitle = Component.empty();
+        for (int i = 0; i < top.size(); i++) {
+            if (i > 0) subtitle = subtitle.append(Component.text("   ", NamedTextColor.WHITE));
+            subtitle = subtitle
+                    .append(Component.text(placeLabels[i] + " ", placeColors[i]))
+                    .append(Component.text(displayName(top.get(i).getKey()), NamedTextColor.WHITE));
+        }
+
+        Title t = Title.title(titleText, subtitle,
+                Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(500)));
+        for (Player p : online) p.showTitle(t);
     }
 
     /** Resolves the display name for a UUID: guild name → player name → UUID string. */

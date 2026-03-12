@@ -150,6 +150,7 @@ public class TimedRaceGame extends Minigame {
 
     @Override
     protected void broadcastScores() {
+        showTopPerformersTitle();
         broadcast(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
         getScores().entrySet().stream()
                 .sorted(Map.Entry.comparingByValue()) // lower time = better
