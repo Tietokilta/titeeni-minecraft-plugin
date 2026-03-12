@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -42,6 +43,8 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
     private final Map<UUID, Location> initialSpawns = new HashMap<>();
     /** Players currently mid-reset — suppresses re-entry for 1 second. */
     private final Set<UUID> resetting = new HashSet<>();
+    /** Players who have boarded the bus — exempt from the reset mechanic. */
+    private final Set<UUID> boarded = new HashSet<>();
 
     public TampereRaceGame(TiteeniPlugin plugin, List<Player> players) {
         super(plugin, players);
@@ -56,6 +59,7 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
             Location spawn = p.getLocation().clone();
             initialSpawns.put(p.getUniqueId(), spawn);
             p.setRespawnLocation(spawn, true);
+            p.setCollidable(false);
             applyEffects(p);
         }
     }
@@ -63,10 +67,14 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
     @Override
     public void stop() {
         HandlerList.unregisterAll(this);
-        for (Player p : getOnlinePlayers()) p.removePotionEffect(PotionEffectType.INVISIBILITY);
+        for (Player p : getOnlinePlayers()) {
+            p.removePotionEffect(PotionEffectType.INVISIBILITY);
+            p.setCollidable(true);
+        }
         restoreInventories();
         initialSpawns.clear();
         resetting.clear();
+        boarded.clear();
         super.stop();
     }
 
@@ -77,7 +85,7 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
 
         Player p = event.getPlayer();
         UUID uid = p.getUniqueId();
-        if (!isParticipant(p) || resetting.contains(uid)) return;
+        if (!isParticipant(p) || resetting.contains(uid) || boarded.contains(uid)) return;
 
         // Diamond boots = past the last checkpoint; no reset, fall damage applies normally
         ItemStack boots = p.getInventory().getBoots();
@@ -104,6 +112,14 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
     }
 
     @EventHandler
+    public void onPlayerDamageByPlayer(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player victim)) return;
+        if (!(event.getDamager() instanceof Player)) return;
+        if (!isParticipant(victim)) return;
+        event.setCancelled(true);
+    }
+
+    @EventHandler
     public void onFallDamage(EntityDamageEvent event) {
         if (event.getCause() != EntityDamageEvent.DamageCause.FALL) return;
         if (!(event.getEntity() instanceof Player p)) return;
@@ -116,7 +132,9 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
 
     @Override
     public void onPlayerBoarded(Player player) {
+        boarded.add(player.getUniqueId());
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        player.setCollidable(true);
         restoreInventory(player);
         super.onPlayerBoarded(player);
     }
