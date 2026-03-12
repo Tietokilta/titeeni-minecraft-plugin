@@ -54,7 +54,8 @@ public class JallupolloGame extends Minigame {
     private int stopGraceCounter;
 
     private BukkitTask gameTick;
-    private BukkitTask hiderSpeedTask;
+    /** Ticks the hider has spent NOT drinking. Counts toward speed degradation. */
+    private int hiderNonDrinkingTicks = 0;
     private int hiderSpeedStage = 0;
     private final JallupolloListener listener;
 
@@ -90,7 +91,6 @@ public class JallupolloGame extends Minigame {
         state = MinigameState.ENDED;
 
         if (gameTick != null) { gameTick.cancel(); gameTick = null; }
-        if (hiderSpeedTask != null) { hiderSpeedTask.cancel(); hiderSpeedTask = null; }
         org.bukkit.event.HandlerList.unregisterAll(listener);
 
         stunnedPlayers.clear();
@@ -137,6 +137,7 @@ public class JallupolloGame extends Minigame {
         boolean handRaised = hider.isHandRaised() && isJaloviina(hider.getActiveItem());
 
         if (handRaised) {
+            // Drinking — halt the speed-degradation counter (do not advance it)
             stopGraceCounter = 0;
             drinkTicks += JallupolloConfig.TICK_INTERVAL_TICKS;
 
@@ -157,17 +158,24 @@ public class JallupolloGame extends Minigame {
                 // Glow for 5 s so seekers can see the hider
                 hider.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING,
                         JallupolloConfig.GLOW_DURATION_TICKS, 0, false, false));
-
-                // Reset the speed-degradation countdown while drinking
-                startHiderSpeedDegradation();
             }
 
-        } else if (isDrinking) {
-            stopGraceCounter++;
-            if (stopGraceCounter >= JallupolloConfig.STOP_DRINK_GRACE_CHECKS) {
-                isDrinking = false;
-                drinkTicks = 0;
-                stopGraceCounter = 0;
+        } else {
+            // Not holding the button — advance the degradation timer
+            hiderNonDrinkingTicks += JallupolloConfig.TICK_INTERVAL_TICKS;
+            if (hiderNonDrinkingTicks >= JallupolloConfig.HIDER_SPEED_DEGRADATION_TICKS) {
+                hiderNonDrinkingTicks = 0;
+                hiderSpeedStage++;
+                applyHiderSpeedEffect();
+            }
+
+            if (isDrinking) {
+                stopGraceCounter++;
+                if (stopGraceCounter >= JallupolloConfig.STOP_DRINK_GRACE_CHECKS) {
+                    isDrinking = false;
+                    drinkTicks = 0;
+                    stopGraceCounter = 0;
+                }
             }
         }
     }
@@ -282,8 +290,10 @@ public class JallupolloGame extends Minigame {
         stopGraceCounter = 0;
 
         hider = newHider;
+        hiderNonDrinkingTicks = 0;
+        hiderSpeedStage = 0;
         hider.getInventory().addItem(createJaloviina());
-        startHiderSpeedDegradation();
+        applyHiderSpeedEffect();
 
         newHider.sendMessage(Component.text(
                 "You are the pöllö! Find a spot, then hold right-click on the Jaloviina to score points.",
@@ -297,25 +307,10 @@ public class JallupolloGame extends Minigame {
 
     // =========================================================================
     // Hider speed degradation
+    // Driven by the main gameTick: hiderNonDrinkingTicks advances only while
+    // the hand is down (halted while drinking). Stage 0 → Speed II,
+    // Stage 1 → Speed I, Stage 2+ → Slowness (stage−2).
     // =========================================================================
-
-    /**
-     * Resets the hider's speed to Speed II and (re)starts the 10-second
-     * degradation timer. Called when the hider becomes active and each second
-     * while they are actively drinking.
-     *
-     * Stage 0 → Speed II, Stage 1 → Speed I, Stage 2+ → Slowness (stage−2).
-     */
-    private void startHiderSpeedDegradation() {
-        if (hiderSpeedTask != null) hiderSpeedTask.cancel();
-        hiderSpeedStage = 0;
-        applyHiderSpeedEffect();
-        hiderSpeedTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
-            if (hider == null || !hider.isOnline()) return;
-            hiderSpeedStage++;
-            applyHiderSpeedEffect();
-        }, JallupolloConfig.HIDER_SPEED_DEGRADATION_TICKS, JallupolloConfig.HIDER_SPEED_DEGRADATION_TICKS);
-    }
 
     private void applyHiderSpeedEffect() {
         if (hider == null || !hider.isOnline()) return;
