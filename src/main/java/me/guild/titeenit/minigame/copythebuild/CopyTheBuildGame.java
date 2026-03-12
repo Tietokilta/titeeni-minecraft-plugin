@@ -5,6 +5,7 @@ import me.guild.titeenit.minigame.Minigame;
 import me.guild.titeenit.minigame.MinigameState;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -30,6 +31,7 @@ public class CopyTheBuildGame extends Minigame {
     private final Map<UUID, Integer> playerModelIndex = new HashMap<>();
     private final Map<Location, BlockState> savedBuildStates = new HashMap<>();
     private final Map<UUID, ItemStack[]> savedInventories = new HashMap<>();
+    private final Map<UUID, GameMode> savedGameModes = new HashMap<>();
 
     private int gameSecondsLeft;
     private BukkitTask gameTimerTask;
@@ -50,7 +52,7 @@ public class CopyTheBuildGame extends Minigame {
             if (buildCorner != null) {
                 playerBuildCorners.put(p.getUniqueId(), buildCorner);
                 playerPreviewCorners.put(p.getUniqueId(),
-                        buildCorner.clone().add(0, 0, CopyTheBuildConfig.PREVIEW_OFFSET_Z));
+                        buildCorner.clone().add(CopyTheBuildConfig.PREVIEW_OFFSET_X, 0, 0));
             }
         }
     }
@@ -64,9 +66,11 @@ public class CopyTheBuildGame extends Minigame {
 
         List<Player> online = getOnlinePlayers();
 
-        // Save inventories
+        // Save inventories and game modes, then put players in creative
         for (Player p : online) {
             savedInventories.put(p.getUniqueId(), p.getInventory().getContents().clone());
+            savedGameModes.put(p.getUniqueId(), p.getGameMode());
+            p.setGameMode(GameMode.CREATIVE);
         }
 
         // Build/preview corners were already set in the constructor from buildPlotsByPlayer.
@@ -123,12 +127,12 @@ public class CopyTheBuildGame extends Minigame {
         }
         savedBuildStates.clear();
 
-        // Restore inventories for online players
+        // Restore inventories and game modes for online players
         for (Player p : getOnlinePlayers()) {
             ItemStack[] saved = savedInventories.get(p.getUniqueId());
-            if (saved != null) {
-                p.getInventory().setContents(saved);
-            }
+            if (saved != null) p.getInventory().setContents(saved);
+            GameMode mode = savedGameModes.get(p.getUniqueId());
+            if (mode != null) p.setGameMode(mode);
         }
 
         broadcastScores();
@@ -189,8 +193,9 @@ public class CopyTheBuildGame extends Minigame {
         if (previewCorner == null) return;
         Location modelCorner = currentModelCorner(p);
         int size = CopyTheBuildConfig.PLOT_SIZE;
+        int height = CopyTheBuildConfig.PLOT_HEIGHT;
         for (int dx = 0; dx < size; dx++) {
-            for (int dy = 0; dy < size; dy++) {
+            for (int dy = 0; dy < height; dy++) {
                 for (int dz = 0; dz < size; dz++) {
                     BlockData data = modelCorner.getWorld().getBlockAt(
                             modelCorner.getBlockX() + dx,
@@ -214,8 +219,9 @@ public class CopyTheBuildGame extends Minigame {
     private Map<Material, Integer> readModelBlocks(Location corner) {
         Map<Material, Integer> counts = new HashMap<>();
         int size = CopyTheBuildConfig.PLOT_SIZE;
+        int height = CopyTheBuildConfig.PLOT_HEIGHT;
         for (int dx = 0; dx < size; dx++) {
-            for (int dy = 0; dy < size; dy++) {
+            for (int dy = 0; dy < height; dy++) {
                 for (int dz = 0; dz < size; dz++) {
                     Material mat = corner.getWorld().getBlockAt(
                             corner.getBlockX() + dx,
@@ -249,8 +255,9 @@ public class CopyTheBuildGame extends Minigame {
 
     private boolean buildsMatch(Location modelCorner, Location buildCorner) {
         int size = CopyTheBuildConfig.PLOT_SIZE;
+        int height = CopyTheBuildConfig.PLOT_HEIGHT;
         for (int dx = 0; dx < size; dx++) {
-            for (int dy = 0; dy < size; dy++) {
+            for (int dy = 0; dy < height; dy++) {
                 for (int dz = 0; dz < size; dz++) {
                     Material model = modelCorner.getWorld().getBlockAt(
                             modelCorner.getBlockX() + dx,
@@ -271,8 +278,9 @@ public class CopyTheBuildGame extends Minigame {
 
     private void saveAreaBlocks(Location corner, Map<Location, BlockState> target) {
         int size = CopyTheBuildConfig.PLOT_SIZE;
+        int height = CopyTheBuildConfig.PLOT_HEIGHT;
         for (int dx = 0; dx < size; dx++) {
-            for (int dy = 0; dy < size; dy++) {
+            for (int dy = 0; dy < height; dy++) {
                 for (int dz = 0; dz < size; dz++) {
                     Block block = corner.getWorld().getBlockAt(
                             corner.getBlockX() + dx,
@@ -287,8 +295,9 @@ public class CopyTheBuildGame extends Minigame {
 
     private void clearArea(Location corner) {
         int size = CopyTheBuildConfig.PLOT_SIZE;
+        int height = CopyTheBuildConfig.PLOT_HEIGHT;
         for (int dx = 0; dx < size; dx++) {
-            for (int dy = 0; dy < size; dy++) {
+            for (int dy = 0; dy < height; dy++) {
                 for (int dz = 0; dz < size; dz++) {
                     corner.getWorld().getBlockAt(
                             corner.getBlockX() + dx,
@@ -326,9 +335,10 @@ public class CopyTheBuildGame extends Minigame {
     private boolean isInArea(Location loc, Location corner) {
         if (!loc.getWorld().equals(corner.getWorld())) return false;
         int size = CopyTheBuildConfig.PLOT_SIZE;
+        int height = CopyTheBuildConfig.PLOT_HEIGHT;
         int dx = loc.getBlockX() - corner.getBlockX();
         int dy = loc.getBlockY() - corner.getBlockY();
         int dz = loc.getBlockZ() - corner.getBlockZ();
-        return dx >= 0 && dx < size && dy >= 0 && dy < size && dz >= 0 && dz < size;
+        return dx >= 0 && dx < size && dy >= 0 && dy < height && dz >= 0 && dz < size;
     }
 }
