@@ -53,12 +53,13 @@ public final class JallupolloConfig {
     // Catch effects
     // -------------------------------------------------------------------------
 
-    public static final double NEARBY_EFFECT_RADIUS = 20.0;
+    /** Radius within which nearby seekers are locked out from stealing after a catch. */
+    public static final double NEARBY_LOCKOUT_RADIUS = 10.0;
 
-    // 20 ticks per second
-    public static final int DEBUFF_DURATION_TICKS = 20 * 10;
-    public static final int SLOWNESS_AMPLIFIER = 4;
+    /** Ticks nearby seekers cannot steal the bottle after a catch (5 s). */
+    public static final int STEAL_LOCKOUT_TICKS = 20 * 3;
+
     public static final int GLOW_DURATION_TICKS = 100; // 5 seconds
     /** Non-drinking ticks required to advance one speed-degradation stage (5 s). */
-    public static final int HIDER_SPEED_DEGRADATION_TICKS = 100;
+    public static final int HIDER_SPEED_DEGRADATION_TICKS = 200;
 }

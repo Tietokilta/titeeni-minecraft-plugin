@@ -252,19 +252,13 @@ public class JallupolloGame extends Minigame {
 
         Player caughtHider = hider;
 
-        for (Player p : getOnlinePlayers()) {
-            if (p.equals(attacker)) continue;
-            if (p.getLocation().distance(caughtHider.getLocation()) <= JallupolloConfig.NEARBY_EFFECT_RADIUS) {
-                p.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS,
-                        JallupolloConfig.DEBUFF_DURATION_TICKS, 0, false, true, true));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
-                        JallupolloConfig.DEBUFF_DURATION_TICKS,
-                        JallupolloConfig.SLOWNESS_AMPLIFIER, false, true, true));
-                UUID stunId = p.getUniqueId();
-                stunnedPlayers.add(stunId);
-                plugin.getServer().getScheduler().runTaskLater(plugin,
-                        () -> stunnedPlayers.remove(stunId), JallupolloConfig.DEBUFF_DURATION_TICKS);
-            }
+        if (caughtHider.isOnline()) {
+            caughtHider.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS,
+                    JallupolloConfig.STEAL_LOCKOUT_TICKS, 0, false, true, true));
+            UUID stunId = caughtHider.getUniqueId();
+            stunnedPlayers.add(stunId);
+            plugin.getServer().getScheduler().runTaskLater(plugin,
+                    () -> stunnedPlayers.remove(stunId), JallupolloConfig.STEAL_LOCKOUT_TICKS);
         }
 
         broadcast(Component.text(attacker.getName(), NamedTextColor.AQUA)
@@ -309,8 +303,8 @@ public class JallupolloGame extends Minigame {
     // =========================================================================
     // Hider speed degradation
     // Driven by the main gameTick: hiderNonDrinkingTicks advances only while
-    // the hand is down (halted while drinking). Stage 0 → Speed II,
-    // Stage 1 → Speed I, Stage 2+ → Slowness (stage−2).
+    // the hand is down (halted while drinking).
+    // Stage 0 → Speed X, Stage 1 → normal, Stage 2+ → Slowness I, II, …
     // =========================================================================
 
     private void applyHiderSpeedEffect() {
@@ -318,14 +312,12 @@ public class JallupolloGame extends Minigame {
         hider.removePotionEffect(PotionEffectType.SPEED);
         hider.removePotionEffect(PotionEffectType.SLOWNESS);
         if (hiderSpeedStage == 0) {
-            hider.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 1, false, false));
-        } else if (hiderSpeedStage == 1) {
-            hider.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 0, false, false));
-        } else {
-            // Stage 2 → Slowness I, Stage 3 → Slowness II, etc.
-            int amplifier = hiderSpeedStage - 2;
+            hider.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 9, false, false));
+        } else if (hiderSpeedStage >= 2) {
+            int amplifier = hiderSpeedStage - 2; // 0 = Slowness I, 1 = Slowness II, …
             hider.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Integer.MAX_VALUE, amplifier, false, false));
         }
+        // Stage 1 = no effect (normal speed)
     }
 
     // =========================================================================
