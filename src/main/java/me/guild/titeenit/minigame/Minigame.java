@@ -5,9 +5,11 @@ import me.guild.titeenit.TiteeniPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,6 +31,10 @@ public abstract class Minigame {
     protected final TiteeniPlugin plugin;
     protected final List<Player> players;
     protected MinigameState state;
+
+    private final Map<UUID, ItemStack[]> savedStorageContents = new HashMap<>();
+    private final Map<UUID, ItemStack[]> savedArmorContents   = new HashMap<>();
+    private final Map<UUID, ItemStack>   savedOffhandItem     = new HashMap<>();
 
     public Minigame(TiteeniPlugin plugin, List<Player> players) {
         this.plugin = plugin;
@@ -88,6 +94,55 @@ public abstract class Minigame {
 
     protected static String formatRemaining(int seconds) {
         return String.format("%d:%02d", seconds / 60, seconds % 60);
+    }
+
+    // -------------------------------------------------------------------------
+    // Inventory save / restore helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Saves every online participant's full inventory (storage + armour + offhand)
+     * and then clears it. Call at game start before handing out game items.
+     */
+    protected void saveAndClearInventories() {
+        for (Player p : getOnlinePlayers()) {
+            UUID uid = p.getUniqueId();
+            savedStorageContents.put(uid, p.getInventory().getStorageContents().clone());
+            savedArmorContents.put(uid, p.getInventory().getArmorContents().clone());
+            savedOffhandItem.put(uid, p.getInventory().getItemInOffHand());
+            p.getInventory().clear();
+            p.getInventory().setArmorContents(new ItemStack[4]);
+            p.getInventory().setItemInOffHand(null);
+        }
+    }
+
+    /**
+     * Restores one online player's inventory from the saved snapshot and removes
+     * their entry from the saved maps. Safe to call mid-game (e.g. on bus board).
+     */
+    protected void restoreInventory(Player p) {
+        UUID uid = p.getUniqueId();
+        ItemStack[] storage = savedStorageContents.remove(uid);
+        ItemStack[] armor   = savedArmorContents.remove(uid);
+        ItemStack   offhand = savedOffhandItem.remove(uid);
+        p.getInventory().clear();
+        p.getInventory().setArmorContents(new ItemStack[4]);
+        if (storage != null) p.getInventory().setStorageContents(storage);
+        if (armor   != null) p.getInventory().setArmorContents(armor);
+        p.getInventory().setItemInOffHand(offhand); // null clears offhand
+    }
+
+    /**
+     * Restores inventories for all online participants and clears the saved maps
+     * (including data for any players who went offline mid-game). Call in stop().
+     */
+    protected void restoreInventories() {
+        for (Player p : players) {
+            if (p.isOnline()) restoreInventory(p);
+        }
+        savedStorageContents.clear();
+        savedArmorContents.clear();
+        savedOffhandItem.clear();
     }
 
     // -------------------------------------------------------------------------

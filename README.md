@@ -65,7 +65,7 @@ Each of the 10 guild representatives is assigned via `/titeeni assign`. Only ass
 | `DIGIT` | Digit |
 | `DATE` | DaTe |
 | `CLUSTER` | Cluster |
-| `SOSA` | SoSa |
+| `SOSA` | SoSA |
 | `TUTTI` | Tutti |
 | `ALGO` | Algo |
 | `OTIT` | OTiT |

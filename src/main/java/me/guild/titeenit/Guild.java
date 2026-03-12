@@ -9,7 +9,7 @@ public enum Guild {
     DIGIT("Digit"),
     DATE("DaTe"),
     CLUSTER("Cluster"),
-    SOSA("SoSa"),
+    SOSA("SoSA"),
     TUTTI("Tutti"),
     ALGO("Algo"),
     OTIT("OTiT");

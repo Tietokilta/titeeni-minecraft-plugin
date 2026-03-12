@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
@@ -38,7 +39,6 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
 
     private static final double FLOOR_OFFSET = 5.0;
 
-    private final Map<UUID, ItemStack> savedBoots = new HashMap<>();
     private final Map<UUID, Location> initialSpawns = new HashMap<>();
     /** Players currently mid-reset — suppresses re-entry for 1 second. */
     private final Set<UUID> resetting = new HashSet<>();
@@ -50,9 +50,9 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
     @Override
     public void start() {
         super.start();
+        saveAndClearInventories();
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         for (Player p : players) {
-            savedBoots.put(p.getUniqueId(), p.getInventory().getBoots());
             Location spawn = p.getLocation().clone();
             initialSpawns.put(p.getUniqueId(), spawn);
             p.setRespawnLocation(spawn, true);
@@ -63,8 +63,8 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
     @Override
     public void stop() {
         HandlerList.unregisterAll(this);
-        for (Player p : getOnlinePlayers()) restorePlayer(p);
-        savedBoots.clear();
+        for (Player p : getOnlinePlayers()) p.removePotionEffect(PotionEffectType.INVISIBILITY);
+        restoreInventories();
         initialSpawns.clear();
         resetting.clear();
         super.stop();
@@ -98,34 +98,37 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
         Player p = event.getPlayer();
-        if (!isParticipant(p) || !savedBoots.containsKey(p.getUniqueId())) return;
+        if (!isParticipant(p)) return;
         // 1-tick delay — respawn clears potion effects after the event fires
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> applyEffects(p), 1L);
     }
 
+    @EventHandler
+    public void onFallDamage(EntityDamageEvent event) {
+        if (event.getCause() != EntityDamageEvent.DamageCause.FALL) return;
+        if (!(event.getEntity() instanceof Player p)) return;
+        if (!isParticipant(p)) return;
+        // Allow fall damage for diamond boots players (dropper funnel section)
+        ItemStack boots = p.getInventory().getBoots();
+        if (boots != null && boots.getType() == Material.DIAMOND_BOOTS) return;
+        event.setCancelled(true);
+    }
+
     @Override
     public void onPlayerBoarded(Player player) {
-        restorePlayer(player);
+        player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        restoreInventory(player);
         super.onPlayerBoarded(player);
     }
 
     @Override
     public void onPlayerQuit(Player player) {
-        UUID uid = player.getUniqueId();
-        savedBoots.remove(uid);
-        initialSpawns.remove(uid);
+        initialSpawns.remove(player.getUniqueId());
         super.onPlayerQuit(player);
     }
 
     private void applyEffects(Player player) {
         player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false));
-    }
-
-    private void restorePlayer(Player player) {
-        UUID uid = player.getUniqueId();
-        player.removePotionEffect(PotionEffectType.INVISIBILITY);
-        ItemStack boots = savedBoots.remove(uid);
-        player.getInventory().setBoots(boots);
     }
 }

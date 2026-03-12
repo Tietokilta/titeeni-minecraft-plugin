@@ -8,7 +8,8 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -64,9 +65,11 @@ public class TradeUpGame extends Minigame {
     @Override
     public void start() {
         state = MinigameState.RUNNING;
+        saveAndClearInventories();
 
         for (Player p : getOnlinePlayers()) {
             p.getInventory().addItem(new ItemStack(Material.BOOK, 1));
+            p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 2, false, false));
         }
 
         broadcast(Component.text(
@@ -79,14 +82,17 @@ public class TradeUpGame extends Minigame {
         if (state == MinigameState.ENDED) return;
         state = MinigameState.ENDED;
 
+        // Compute scores from current inventory before restoring
         for (Player p : getOnlinePlayers()) {
             int index = highestChainIndex(p);
             scores.put(p.getUniqueId(), Math.max(index, 0));
             String itemName = index >= 0 ? CHAIN.get(index).displayName() : "nothing";
             p.sendMessage(Component.text(
                     "You finished with: " + itemName, NamedTextColor.AQUA));
+            p.removePotionEffect(PotionEffectType.SPEED);
         }
 
+        restoreInventories();
         broadcastScores();
         broadcast(Component.text("Trade Up has ended!", NamedTextColor.GOLD));
     }

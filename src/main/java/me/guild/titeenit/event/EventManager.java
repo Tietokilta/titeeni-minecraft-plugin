@@ -18,6 +18,8 @@ import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -78,6 +80,14 @@ public class EventManager implements Listener {
         tabObjective.setDisplaySlot(DisplaySlot.PLAYER_LIST);
 
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+
+        // Keep all assigned players permanently fed — refresh every 2 s, no particles
+        plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            PotionEffect saturation = new PotionEffect(PotionEffectType.SATURATION, 9999, 0, false, false);
+            for (Player p : guildRegistry.getAssignedOnlinePlayers()) {
+                p.addPotionEffect(saturation);
+            }
+        }, 20L, 40L);
     }
 
     // -------------------------------------------------------------------------
@@ -175,17 +185,7 @@ public class EventManager implements Listener {
             minigameManager.stopGame();
         }
 
-        // For stages 2+: force-teleport anyone who didn't board on their own
-        if (!isFirstStage) {
-            for (Player p : guildRegistry.getAssignedOnlinePlayers()) {
-                if (!playersOnBus.contains(p.getUniqueId())) {
-                    playersOnBus.add(p.getUniqueId());
-                    locationConfig.getBusLocation().ifPresent(p::teleport);
-                    p.sendMessage(Component.text(
-                            "You were teleported to the bus.", NamedTextColor.YELLOW));
-                }
-            }
-        }
+        autoBoardRemaining();
 
         currentStage = nextStage;
         advancing = true;
