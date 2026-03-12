@@ -8,6 +8,7 @@ import me.guild.titeenit.minigame.copythebuild.CopyTheBuildGame;
 import me.guild.titeenit.minigame.findthebutton.FindTheButtonGame;
 import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
 import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillGame;
+import me.guild.titeenit.minigame.timedrace.TampereRaceGame;
 import me.guild.titeenit.minigame.timedrace.TimedRaceGame;
 import me.guild.titeenit.minigame.timedrace.TurkuRaceGame;
 import net.kyori.adventure.text.Component;
@@ -355,6 +356,9 @@ public class EventManager implements Listener {
         switch (stage.getMinigameKey()) {
             case "timedrace" -> {
                 minigameManager.startGame(new TimedRaceGame(plugin, players));
+            }
+            case "tampererace" -> {
+                minigameManager.startGame(new TampereRaceGame(plugin, players));
             }
             case "boatrace" -> {
                 double gateZ = locationConfig.getTurkuGateZ();
