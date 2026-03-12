@@ -33,8 +33,6 @@ public class CopyTheBuildGame extends Minigame {
     private final Map<UUID, ItemStack[]> savedInventories = new HashMap<>();
     private final Map<UUID, GameMode> savedGameModes = new HashMap<>();
 
-    private int gameSecondsLeft;
-    private BukkitTask gameTimerTask;
     private BukkitTask checkTask;
 
     private final CopyTheBuildListener listener;
@@ -44,7 +42,6 @@ public class CopyTheBuildGame extends Minigame {
         super(plugin, players);
         this.modelPlots = modelPlots;
         this.listener = new CopyTheBuildListener(plugin, this);
-        this.gameSecondsLeft = CopyTheBuildConfig.GAME_DURATION_SECONDS;
         for (Player p : players) {
             scores.put(p.getUniqueId(), 0);
             playerModelIndex.put(p.getUniqueId(), 0);
@@ -84,17 +81,6 @@ public class CopyTheBuildGame extends Minigame {
 
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
 
-        gameTimerTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
-            gameSecondsLeft--;
-            if (gameSecondsLeft == 60 || gameSecondsLeft == 30 || gameSecondsLeft == 10) {
-                broadcast(Component.text(gameSecondsLeft + " seconds remaining!", NamedTextColor.YELLOW));
-            }
-            if (gameSecondsLeft <= 0) {
-                plugin.getMinigameManager().onGameSelfTerminated();
-                stop();
-            }
-        }, 20L, 20L);
-
         // Clear build areas, populate previews, and hand out first model
         for (Player p : online) {
             clearArea(playerBuildCorners.get(p.getUniqueId()));
@@ -116,8 +102,7 @@ public class CopyTheBuildGame extends Minigame {
         if (state == MinigameState.ENDED) return;
         state = MinigameState.ENDED;
 
-        if (gameTimerTask != null) { gameTimerTask.cancel(); gameTimerTask = null; }
-        if (checkTask != null)     { checkTask.cancel();     checkTask = null;     }
+        if (checkTask != null) { checkTask.cancel(); checkTask = null; }
 
         org.bukkit.event.HandlerList.unregisterAll(listener);
 

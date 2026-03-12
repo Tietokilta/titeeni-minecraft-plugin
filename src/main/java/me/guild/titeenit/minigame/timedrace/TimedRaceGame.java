@@ -26,6 +26,7 @@ public class TimedRaceGame extends Minigame {
     private final Map<UUID, Long> startTimes = new HashMap<>();
     private final Map<UUID, Integer> completionTimes = new HashMap<>(); // milliseconds
     private BukkitTask tickTask;
+    private int remainingSeconds = getTimerSeconds();
 
     public TimedRaceGame(TiteeniPlugin plugin, java.util.List<Player> players) {
         super(plugin, players);
@@ -55,16 +56,17 @@ public class TimedRaceGame extends Minigame {
             long tick = System.currentTimeMillis();
             for (Player p : getOnlinePlayers()) {
                 UUID uid = p.getUniqueId();
+                String remaining = " | " + formatRemaining(remainingSeconds);
                 if (completionTimes.containsKey(uid)) {
                     p.sendActionBar(Component.text(
-                            "Finished: " + formatTime(completionTimes.get(uid)),
+                            "Finished: " + formatTime(completionTimes.get(uid)) + remaining,
                             NamedTextColor.GREEN));
                 } else {
                     Long start = startTimes.get(uid);
                     if (start == null) continue;
                     int elapsed = (int) (tick - start);
                     p.sendActionBar(Component.text(
-                            "Time: " + formatTime(elapsed), NamedTextColor.YELLOW));
+                            "Time: " + formatTime(elapsed) + remaining, NamedTextColor.YELLOW));
                 }
             }
         }, 1L, 1L);
@@ -135,6 +137,25 @@ public class TimedRaceGame extends Minigame {
                     completionTimes.getOrDefault(p.getUniqueId(), Integer.MAX_VALUE));
         }
         return Collections.unmodifiableMap(scores);
+    }
+
+    @Override
+    public void onTimerTick(int secondsLeft) {
+        remainingSeconds = secondsLeft; // tickTask picks this up on its next run
+    }
+
+    // -------------------------------------------------------------------------
+    // Scores display
+    // -------------------------------------------------------------------------
+
+    @Override
+    protected void broadcastScores() {
+        broadcast(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
+        getScores().entrySet().stream()
+                .sorted(Map.Entry.comparingByValue()) // lower time = better
+                .forEach(entry -> broadcast(Component.text(
+                        displayName(entry.getKey()) + ": " + formatTime(entry.getValue()),
+                        NamedTextColor.YELLOW)));
     }
 
     // -------------------------------------------------------------------------

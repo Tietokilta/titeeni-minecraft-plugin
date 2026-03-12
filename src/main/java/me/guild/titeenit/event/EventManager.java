@@ -9,6 +9,7 @@ import me.guild.titeenit.minigame.findthebutton.FindTheButtonGame;
 import me.guild.titeenit.minigame.jallupollo.JallupolloGame;
 import me.guild.titeenit.minigame.kingofthehill.KingOfTheHillGame;
 import me.guild.titeenit.minigame.timedrace.TampereRaceGame;
+import me.guild.titeenit.minigame.tradeup.TradeUpGame;
 import me.guild.titeenit.minigame.timedrace.TimedRaceGame;
 import me.guild.titeenit.minigame.timedrace.TurkuRaceGame;
 import net.kyori.adventure.text.Component;
@@ -341,6 +342,19 @@ public class EventManager implements Listener {
     public EventStage getCurrentStage() { return currentStage; }
     public Set<UUID> getPlayersOnBus() { return Set.copyOf(playersOnBus); }
 
+    /**
+     * Boards every assigned online player who has not yet boarded.
+     * Called automatically when a minigame's timer expires so no one is left
+     * behind waiting at the end of a stage.
+     */
+    public void autoBoardRemaining() {
+        for (Player p : guildRegistry.getAssignedOnlinePlayers()) {
+            if (!playersOnBus.contains(p.getUniqueId())) {
+                boardBus(p);
+            }
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Internal: launch minigame for a given stage
     // -------------------------------------------------------------------------
@@ -359,6 +373,9 @@ public class EventManager implements Listener {
             }
             case "tampererace" -> {
                 minigameManager.startGame(new TampereRaceGame(plugin, players));
+            }
+            case "tradeup" -> {
+                minigameManager.startGame(new TradeUpGame(plugin, players));
             }
             case "boatrace" -> {
                 double gateZ = locationConfig.getTurkuGateZ();

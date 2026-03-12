@@ -12,7 +12,6 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,15 +27,11 @@ public class KingOfTheHillGame extends Minigame {
     private final NamespacedKey knockbackKey;
     private final KingOfTheHillListener listener;
     private final double hillTopY;
-    private BukkitTask gameTick;
-    private int secondsLeft;
-
     public KingOfTheHillGame(TiteeniPlugin plugin, List<Player> players, double hillTopY) {
         super(plugin, players);
         this.knockbackKey = new NamespacedKey(plugin, "koth_knockback");
         this.listener = new KingOfTheHillListener(plugin, this);
         this.hillTopY = hillTopY;
-        this.secondsLeft = KingOfTheHillConfig.GAME_DURATION_SECONDS;
         for (Player p : players) scores.put(p.getUniqueId(), 0);
     }
 
@@ -52,8 +47,6 @@ public class KingOfTheHillGame extends Minigame {
         state = MinigameState.RUNNING;
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
         for (Player p : getOnlinePlayers()) applyKnockback(p);
-        gameTick = plugin.getServer().getScheduler().runTaskTimer(
-                plugin, this::tick, KingOfTheHillConfig.TICK_INTERVAL_TICKS, KingOfTheHillConfig.TICK_INTERVAL_TICKS);
         broadcast(Component.text(
                 "King of the Hill has started! Climb to the top and hold your position to score!",
                 NamedTextColor.GOLD));
@@ -62,7 +55,6 @@ public class KingOfTheHillGame extends Minigame {
     @Override
     public void stop() {
         state = MinigameState.ENDED;
-        if (gameTick != null) { gameTick.cancel(); gameTick = null; }
         HandlerList.unregisterAll(listener);
         for (Player p : getOnlinePlayers()) removeKnockback(p);
         broadcastScores();
@@ -83,23 +75,14 @@ public class KingOfTheHillGame extends Minigame {
     public Map<UUID, Integer> getScores() { return Collections.unmodifiableMap(scores); }
 
     // =========================================================================
-    // Game tick (runs every 20 ticks = 1 second)
+    // Timer tick (scoring + action bar, driven by MinigameManager every second)
     // =========================================================================
 
-    private void tick() {
+    @Override
+    public void onTimerTick(int secondsLeft) {
         if (state != MinigameState.RUNNING) return;
         List<Player> online = getOnlinePlayers();
         if (online.isEmpty()) return;
-
-        secondsLeft--;
-        if (secondsLeft == 60 || secondsLeft == 30 || secondsLeft == 10) {
-            broadcast(Component.text(secondsLeft + " seconds remaining!", NamedTextColor.YELLOW));
-        }
-        if (secondsLeft <= 0) {
-            plugin.getMinigameManager().onGameSelfTerminated();
-            stop();
-            return;
-        }
 
         List<Player> atPeak = online.stream()
                 .filter(p -> p.getLocation().getY() >= hillTopY)
@@ -109,10 +92,10 @@ public class KingOfTheHillGame extends Minigame {
             scores.merge(p.getUniqueId(), KingOfTheHillConfig.POINTS_PER_SECOND, Integer::sum);
         }
 
-        sendActionBar(online, atPeak);
+        sendActionBar(online, atPeak, secondsLeft);
     }
 
-    private void sendActionBar(List<Player> online, List<Player> atPeak) {
+    private void sendActionBar(List<Player> online, List<Player> atPeak, int secondsLeft) {
         Set<UUID> atPeakUuids = new HashSet<>();
         for (Player p : atPeak) atPeakUuids.add(p.getUniqueId());
 
@@ -156,7 +139,8 @@ public class KingOfTheHillGame extends Minigame {
                         NamedTextColor.YELLOW);
             }
 
-            viewer.sendActionBar(leaderboard.append(separator).append(viewerPart));
+            viewer.sendActionBar(leaderboard.append(separator).append(viewerPart)
+                    .append(Component.text("  " + formatRemaining(secondsLeft), NamedTextColor.GRAY)));
         }
     }
 

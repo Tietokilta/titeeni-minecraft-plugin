@@ -1,5 +1,6 @@
 package me.guild.titeenit.minigame;
 
+import me.guild.titeenit.Guild;
 import me.guild.titeenit.TiteeniPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -9,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -68,6 +70,26 @@ public abstract class Minigame {
      */
     public void onPlayerBoarded(Player player) {}
 
+    /**
+     * Duration of the central game timer in seconds. MinigameManager announces
+     * the time remaining at 60 s, 30 s, and 10 s, then auto-boards remaining
+     * players and stops the game when it reaches zero. Override to customise.
+     */
+    public int getTimerSeconds() { return 300; }
+
+    /**
+     * Called by MinigameManager every second. Default implementation shows the
+     * remaining time in the action bar. Override to combine with other content
+     * (e.g. KOTH appends it to its leaderboard bar) or to suppress it entirely.
+     */
+    public void onTimerTick(int secondsLeft) {
+        broadcastActionBar(Component.text(formatRemaining(secondsLeft), NamedTextColor.YELLOW));
+    }
+
+    protected static String formatRemaining(int seconds) {
+        return String.format("%d:%02d", seconds / 60, seconds % 60);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers available to all subclasses
     // -------------------------------------------------------------------------
@@ -76,7 +98,7 @@ public abstract class Minigame {
         return players.stream().filter(Player::isOnline).toList();
     }
 
-    protected void broadcast(Component message) {
+    public void broadcast(Component message) {
         for (Player p : getOnlinePlayers()) {
             p.sendMessage(message);
         }
@@ -95,11 +117,17 @@ public abstract class Minigame {
                 : Map.Entry.<UUID, Integer>comparingByValue().reversed();
         getScores().entrySet().stream()
                 .sorted(comparator)
-                .forEach(entry -> {
-                    Player p = plugin.getServer().getPlayer(entry.getKey());
-                    String name = p != null ? p.getName() : entry.getKey().toString();
-                    broadcast(Component.text(name + ": " + entry.getValue() + " points", NamedTextColor.YELLOW));
-                });
+                .forEach(entry -> broadcast(Component.text(
+                        displayName(entry.getKey()) + ": " + entry.getValue() + " points",
+                        NamedTextColor.YELLOW)));
+    }
+
+    /** Resolves the display name for a UUID: guild name → player name → UUID string. */
+    protected String displayName(UUID uuid) {
+        Optional<Guild> guild = plugin.getGuildRegistry().getGuild(uuid);
+        if (guild.isPresent()) return guild.get().getDisplayName();
+        Player p = plugin.getServer().getPlayer(uuid);
+        return p != null ? p.getName() : uuid.toString();
     }
 
     // -------------------------------------------------------------------------

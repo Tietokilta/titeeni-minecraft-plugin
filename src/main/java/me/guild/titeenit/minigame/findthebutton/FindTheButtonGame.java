@@ -24,14 +24,11 @@ public class FindTheButtonGame extends Minigame {
     private final Map<Location, BlockState> removedButtons = new HashMap<>();
 
     private final FindTheButtonListener listener;
-    private BukkitTask timerTask;
-    private int secondsLeft;
 
     public FindTheButtonGame(TiteeniPlugin plugin, List<Player> players) {
         super(plugin, players);
         this.listener = new FindTheButtonListener(plugin, this);
         for (Player p : players) scores.put(p.getUniqueId(), 0);
-        this.secondsLeft = FindTheButtonConfig.GAME_DURATION_SECONDS;
     }
 
     @Override
@@ -42,17 +39,6 @@ public class FindTheButtonGame extends Minigame {
         state = MinigameState.RUNNING;
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
 
-        timerTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
-            secondsLeft--;
-            if (secondsLeft == 60 || secondsLeft == 30 || secondsLeft == 10) {
-                broadcast(Component.text(secondsLeft + " seconds remaining!", NamedTextColor.YELLOW));
-            }
-            if (secondsLeft <= 0) {
-                plugin.getMinigameManager().onGameSelfTerminated();
-                stop();
-            }
-        }, 20L, 20L);
-
         broadcast(Component.text("Find the Button has started! You have "
                 + FindTheButtonConfig.GAME_DURATION_SECONDS / 60 + " minutes — find and click buttons to score!",
                 NamedTextColor.GOLD));
@@ -61,7 +47,6 @@ public class FindTheButtonGame extends Minigame {
     @Override
     public void stop() {
         state = MinigameState.ENDED;
-        if (timerTask != null) { timerTask.cancel(); timerTask = null; }
         org.bukkit.event.HandlerList.unregisterAll(listener);
         restoreButtons();
         broadcastScores();

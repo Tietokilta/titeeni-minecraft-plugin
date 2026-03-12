@@ -6,7 +6,7 @@ public enum EventStage {
     AINOA(   "Ainoa, Tapiola",  "Escape the maze",          "timedrace"),
     TURKU(   "Turku",           "Race to the finish",                         "boatrace"),
     TAMPERE( "Tampere",         "Complete the parkour and board the bus",      "tampererace"),
-    VAASA(   "Vaasa",           "Deliver all packages",                        null),
+    VAASA(   "Vaasa",           "Trade up the item chain",                     "tradeup"),
     OULU(    "Oulu",            "Slay the wither",                             "timedrace"),
     JYVASKYLA("Jyväskylä",     "Find the hidden buttons to score",            "findthebutton"),
     LAPPEENRANTA("Lappeenranta","Replicate the model structure to score",      "copythebuild"),

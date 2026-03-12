@@ -53,7 +53,9 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         for (Player p : players) {
             savedBoots.put(p.getUniqueId(), p.getInventory().getBoots());
-            initialSpawns.put(p.getUniqueId(), p.getLocation().clone());
+            Location spawn = p.getLocation().clone();
+            initialSpawns.put(p.getUniqueId(), spawn);
+            p.setRespawnLocation(spawn, true);
             applyEffects(p);
         }
     }
