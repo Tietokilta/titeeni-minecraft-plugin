@@ -18,8 +18,8 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Zombie;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
@@ -142,15 +142,18 @@ public class ShootingGalleryGame extends Minigame {
         targetBlock.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, center, 1);
 
         int newScore = scores.merge(shooter.getUniqueId(), ShootingGalleryConfig.POINTS_PER_TARGET, Integer::sum);
-        int zombieCount = 1 + (newScore / 5);
+        int zombieCount = 1 + (newScore / 10);
 
         plugin.getGuildRegistry().getGuild(shooter.getUniqueId()).ifPresent(guild -> {
             Location spawnLoc = zombieSpawns.get(guild);
             if (spawnLoc != null) {
                 for (int i = 0; i < zombieCount; i++) {
                     Entity zombie = spawnLoc.getWorld().spawnEntity(spawnLoc, EntityType.ZOMBIE);
-                    if (zombie instanceof Mob mob) {
-                        AttributeInstance range = mob.getAttribute(Attribute.FOLLOW_RANGE);
+                    if (zombie instanceof Zombie z) {
+                        z.setAdult();
+                        z.getEquipment().setHelmet(new ItemStack(Material.LEATHER_HELMET));
+                        z.getEquipment().setHelmetDropChance(0f);
+                        AttributeInstance range = z.getAttribute(Attribute.FOLLOW_RANGE);
                         if (range != null) range.setBaseValue(256.0);
                     }
                     spawnedEntities.add(zombie.getUniqueId());
