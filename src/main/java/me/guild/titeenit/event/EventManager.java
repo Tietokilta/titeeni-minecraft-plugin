@@ -24,6 +24,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
@@ -285,6 +286,11 @@ public class EventManager implements Listener {
                 p.setScoreboard(scoreboard);
             }
         }
+    }
+
+    @EventHandler
+    public void onChat(AsyncChatEvent event) {
+        event.setCancelled(true);
     }
 
     @EventHandler
