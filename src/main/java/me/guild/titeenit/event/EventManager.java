@@ -175,25 +175,20 @@ public class EventManager implements Listener {
         } else {
             Optional<EventStage> next = currentStage.next();
             if (next.isEmpty()) {
-                // Last stage finished — score final game, show leaderboard, then reset
-                if (minigameManager.getCurrentGame() != null) {
-                    accumulateRankedScores(minigameManager.getCurrentGame());
-                    minigameManager.stopGame();
-                }
-                broadcastFinalLeaderboard();
-                resetState();
                 sender.sendMessage(Component.text(
-                        "Event complete! Scores cleared. Use /titeeni advance to run again.",
-                        NamedTextColor.GREEN));
+                        "The last stage is still running. It will end automatically.",
+                        NamedTextColor.YELLOW));
                 return;
             }
             nextStage = next.get();
         }
 
-        // Score and stop the current game
+        // If the admin advances before the timer runs out, score and stop the game now.
+        // Normally the game is already scored and stopped when the timer expires.
         if (minigameManager.getCurrentGame() != null) {
-            accumulateRankedScores(minigameManager.getCurrentGame());
+            Minigame current = minigameManager.getCurrentGame();
             minigameManager.stopGame();
+            accumulateRankedScores(current);
         }
 
         autoBoardRemaining();
@@ -251,6 +246,19 @@ public class EventManager implements Listener {
     // -------------------------------------------------------------------------
     // Ranked score accumulation
     // -------------------------------------------------------------------------
+
+    /**
+     * Called by MinigameManager when a game ends naturally (timer expired or
+     * self-terminated). Scores the game and, if this was the last stage, shows
+     * the final leaderboard and resets so the event can be run again.
+     */
+    public void onMinigameEnded(Minigame game) {
+        accumulateRankedScores(game);
+        if (currentStage != null && currentStage.next().isEmpty()) {
+            broadcastFinalLeaderboard();
+            resetState();
+        }
+    }
 
     /**
      * Ranks players by raw game score, awards event points by rank, and

@@ -50,7 +50,9 @@ public class MinigameManager implements Listener {
     /** Called by a game when it ends itself (e.g. all players finished the race). */
     public void onGameSelfTerminated() {
         cancelTimer();
+        Minigame ended = currentGame;
         currentGame = null;
+        if (ended != null) plugin.getEventManager().onMinigameEnded(ended);
     }
 
     public Minigame getCurrentGame() { return currentGame; }
@@ -69,7 +71,9 @@ public class MinigameManager implements Listener {
             }
             if (secondsLeft[0] <= 0) {
                 plugin.getEventManager().autoBoardRemaining();
+                Minigame ended = currentGame;
                 stopGame();
+                if (ended != null) plugin.getEventManager().onMinigameEnded(ended);
             }
         }, 20L, 20L);
     }
