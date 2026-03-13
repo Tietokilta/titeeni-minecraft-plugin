@@ -171,7 +171,7 @@ public class EventManager implements Listener {
         if (targetStage != null) {
             nextStage = targetStage;
         } else if (isFirstStage) {
-            nextStage = EventStage.AINOA;
+            nextStage = EventStage.values()[0];
         } else {
             Optional<EventStage> next = currentStage.next();
             if (next.isEmpty()) {
@@ -361,7 +361,7 @@ public class EventManager implements Listener {
     /**
      * Ends the event immediately without showing a leaderboard. The current game
      * (if any) is stopped and all state is cleared so the next
-     * {@code /titeeni advance} starts from AINOA.
+     * {@code /titeeni advance} starts from the first stage.
      */
     public void endEvent(CommandSender sender) {
         if (advancing) {
@@ -375,7 +375,7 @@ public class EventManager implements Listener {
         }
         resetState();
         sender.sendMessage(Component.text(
-                "Event ended. Use /titeeni advance to start from AINOA.",
+                "Event ended. Use /titeeni advance to start from the first stage.",
                 NamedTextColor.GREEN));
     }
 

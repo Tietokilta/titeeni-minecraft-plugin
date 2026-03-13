@@ -3,7 +3,6 @@ package me.guild.titeenit.event;
 import java.util.Optional;
 
 public enum EventStage {
-    AINOA(   "Ainoa, Tapiola",  "Escape the maze",          "timedrace"),
     TURKU(   "Turku",           "Race to the finish",                         "boatrace"),
     TAMPERE( "Tampere",         "Complete the parkour and board the bus",      "tampererace"),
     VAASA(   "Vaasa",           "Trade up the item chain",                     "tradeup"),
