@@ -57,7 +57,7 @@ public final class JallupolloConfig {
     public static final double NEARBY_LOCKOUT_RADIUS = 10.0;
 
     /** Ticks nearby seekers cannot steal the bottle after a catch (5 s). */
-    public static final int STEAL_LOCKOUT_TICKS = 20 * 3;
+    public static final int STEAL_LOCKOUT_TICKS = 20 * 5;
 
     public static final int GLOW_DURATION_TICKS = 100; // 5 seconds
     /** Non-drinking ticks required to advance one speed-degradation stage (5 s). */

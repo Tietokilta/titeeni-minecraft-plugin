@@ -9,7 +9,6 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.BlockState;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -84,10 +83,13 @@ public class FindTheButtonGame extends Minigame {
             if (state != MinigameState.RUNNING) return; // game ended; restoreButtons() handles it
             block.setType(Material.AIR);
             scores.merge(player.getUniqueId(), FindTheButtonConfig.POINTS_PER_BUTTON, Integer::sum);
-            broadcast(Component.text(player.getName(), NamedTextColor.AQUA)
+            int score = scores.get(player.getUniqueId());
+            if (score % 10 == 0) {
+                broadcast(Component.text(player.getName(), NamedTextColor.AQUA)
                     .append(Component.text(" found a button! (", NamedTextColor.GREEN))
                     .append(Component.text(scores.get(player.getUniqueId()) + " pts", NamedTextColor.YELLOW))
                     .append(Component.text(")", NamedTextColor.GREEN)));
+            }
         }, 15L);
     }
 

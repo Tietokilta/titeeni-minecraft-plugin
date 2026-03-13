@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,7 +34,11 @@ import java.util.UUID;
  *   6  Cooked Porkchop
  *   7  Fishing Rod
  *   8  Diamond Axe
- *   9  Emerald
+ *   9  Emerald  ← player is auto-boarded on the bus when holding this
+ *
+ * Score encoding: position * 1_000_000 + time_bonus
+ *   where time_bonus = timerMs − ms_elapsed_when_position_achieved  (≥ 0)
+ * This lets chain position dominate while time breaks ties within a position.
  */
 public class TradeUpGame extends Minigame {
 
@@ -52,7 +57,11 @@ public class TradeUpGame extends Minigame {
             new ChainEntry(Material.EMERALD,         1, "Emerald")
     );
 
-    private final Map<UUID, Integer> scores = new HashMap<>();
+    private final Map<UUID, Integer> scores             = new HashMap<>();
+    private final Map<UUID, Integer> lastKnownPosition  = new HashMap<>();
+    private final Map<UUID, Long>    positionAchievedAt = new HashMap<>();
+    private long startTimeMs;
+    private BukkitTask tickTask;
 
     public TradeUpGame(TiteeniPlugin plugin, List<Player> players) {
         super(plugin, players);
@@ -65,12 +74,16 @@ public class TradeUpGame extends Minigame {
     @Override
     public void start() {
         state = MinigameState.RUNNING;
+        startTimeMs = System.currentTimeMillis();
         saveAndClearInventories();
 
         for (Player p : getOnlinePlayers()) {
             p.getInventory().addItem(new ItemStack(Material.BOOK, 1));
             p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 4, false, false));
         }
+
+        // Check inventories every second: update position tracking + auto-board on emerald
+        tickTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::checkInventories, 20L, 20L);
 
         broadcast(Component.text(
                 "Trade Up has started! Trade your book up the chain as far as you can!",
@@ -82,13 +95,29 @@ public class TradeUpGame extends Minigame {
         if (state == MinigameState.ENDED) return;
         state = MinigameState.ENDED;
 
-        // Compute scores from current inventory before restoring
+        if (tickTask != null) { tickTask.cancel(); tickTask = null; }
+
+        long now = System.currentTimeMillis();
+        int timerMs = getTimerSeconds() * 1000;
+
         for (Player p : getOnlinePlayers()) {
+            UUID uid = p.getUniqueId();
+
+            // Final inventory scan in case tick hasn't caught the last trade
             int index = highestChainIndex(p);
-            scores.put(p.getUniqueId(), Math.max(index, 0));
-            String itemName = index >= 0 ? CHAIN.get(index).displayName() : "nothing";
+            if (index > lastKnownPosition.getOrDefault(uid, -1)) {
+                lastKnownPosition.put(uid, index);
+                positionAchievedAt.put(uid, now);
+            }
+
+            int pos = Math.max(lastKnownPosition.getOrDefault(uid, 0), 0);
+            long achievedAt = positionAchievedAt.getOrDefault(uid, now);
+            int elapsed = (int) Math.min(timerMs, achievedAt - startTimeMs);
+            int timeBonus = Math.max(0, timerMs - elapsed);
+            scores.put(uid, pos * 1_000_000 + timeBonus);
+
             p.sendMessage(Component.text(
-                    "You finished with: " + itemName, NamedTextColor.AQUA));
+                    "You finished with: " + CHAIN.get(pos).displayName(), NamedTextColor.AQUA));
             p.removePotionEffect(PotionEffectType.SPEED);
         }
 
@@ -111,9 +140,41 @@ public class TradeUpGame extends Minigame {
         return Collections.unmodifiableMap(scores);
     }
 
+    @Override
+    protected void broadcastScores() {
+        showTopPerformersTitle();
+        broadcastAll(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
+        getScores().entrySet().stream()
+                .sorted(Map.Entry.<UUID, Integer>comparingByValue().reversed())
+                .forEach(entry -> {
+                    int pos = entry.getValue() / 1_000_000;
+                    String item = (pos >= 0 && pos < CHAIN.size()) ? CHAIN.get(pos).displayName() : "nothing";
+                    broadcastAll(Component.text(displayName(entry.getKey()) + ": " + item, NamedTextColor.YELLOW));
+                });
+    }
+
     // -------------------------------------------------------------------------
-    // Scoring
+    // Inventory scanning
     // -------------------------------------------------------------------------
+
+    /** Called every second; updates position tracking and auto-boards emerald holders. */
+    private void checkInventories() {
+        if (state != MinigameState.RUNNING) return;
+        long now = System.currentTimeMillis();
+        for (Player p : getOnlinePlayers()) {
+            int index = highestChainIndex(p);
+            if (index < 0) continue;
+            UUID uid = p.getUniqueId();
+            if (index > lastKnownPosition.getOrDefault(uid, -1)) {
+                lastKnownPosition.put(uid, index);
+                positionAchievedAt.put(uid, now);
+                if (index == CHAIN.size() - 1) {
+                    // Player reached the emerald — board them on the bus
+                    plugin.getEventManager().boardBus(p);
+                }
+            }
+        }
+    }
 
     /** Returns the highest chain index the player currently holds, or -1 if none. */
     private int highestChainIndex(Player p) {

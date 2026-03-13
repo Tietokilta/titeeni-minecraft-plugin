@@ -42,18 +42,21 @@ public class JallupolloListener implements Listener {
     public void onEntityDamage(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Player damaged)) return;
         if (!game.isParticipant(damaged)) return;
-
-        event.setCancelled(true);   // suppress all damage for participants
-
         if (game.getState() != MinigameState.RUNNING) return;
 
         Player attacker = resolveAttacker(event);
         if (attacker == null || !game.isParticipant(attacker)) return;
-        if (!damaged.equals(game.getHider())) return;
-        if (attacker.equals(game.getHider())) return;
-        if (game.isStunned(attacker)) return;
 
-        game.onHiderHit(attacker);
+        // Hider hit by seeker → role transfer (cancel damage, trigger mechanic)
+        if (damaged.equals(game.getHider()) && !attacker.equals(game.getHider())) {
+            event.setCancelled(true);
+            if (!game.isStunned(attacker)) {
+                game.onHiderHit(attacker);
+            }
+            return;
+        }
+
+        // PvP between other participants is allowed — no cancellation
     }
 
     /** Cancel environmental damage (fall, fire, drowning…) for all participants. */

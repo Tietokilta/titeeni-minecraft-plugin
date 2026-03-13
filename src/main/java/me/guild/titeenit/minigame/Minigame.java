@@ -163,6 +163,10 @@ public abstract class Minigame {
         }
     }
 
+    protected void broadcastAll(Component message) {
+        plugin.getServer().broadcast(message);
+    }
+
     protected void broadcastActionBar(Component message) {
         for (Player p : getOnlinePlayers()) {
             p.sendActionBar(message);
@@ -171,13 +175,13 @@ public abstract class Minigame {
 
     protected void broadcastScores() {
         showTopPerformersTitle();
-        broadcast(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
+        broadcastAll(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
         var comparator = isLowerScoreBetter()
                 ? Map.Entry.<UUID, Integer>comparingByValue()
                 : Map.Entry.<UUID, Integer>comparingByValue().reversed();
         getScores().entrySet().stream()
                 .sorted(comparator)
-                .forEach(entry -> broadcast(Component.text(
+                .forEach(entry -> broadcastAll(Component.text(
                         displayName(entry.getKey()) + ": " + entry.getValue() + " points",
                         NamedTextColor.YELLOW)));
     }
@@ -217,7 +221,7 @@ public abstract class Minigame {
 
         Title t = Title.title(titleText, subtitle,
                 Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(500)));
-        for (Player p : online) p.showTitle(t);
+        for (Player p : plugin.getServer().getOnlinePlayers()) p.showTitle(t);
     }
 
     /** Resolves the display name for a UUID: guild name → player name → UUID string. */

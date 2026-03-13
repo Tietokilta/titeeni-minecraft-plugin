@@ -151,10 +151,10 @@ public class TimedRaceGame extends Minigame {
     @Override
     protected void broadcastScores() {
         showTopPerformersTitle();
-        broadcast(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
+        broadcastAll(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
         getScores().entrySet().stream()
                 .sorted(Map.Entry.comparingByValue()) // lower time = better
-                .forEach(entry -> broadcast(Component.text(
+                .forEach(entry -> broadcastAll(Component.text(
                         displayName(entry.getKey()) + ": " + formatTime(entry.getValue()),
                         NamedTextColor.YELLOW)));
     }
@@ -163,7 +163,7 @@ public class TimedRaceGame extends Minigame {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static String formatTime(int ms) {
+    protected static String formatTime(int ms) {
         if (ms == Integer.MAX_VALUE) return "DNF";
         int minutes = ms / 60_000;
         int seconds = (ms % 60_000) / 1000;

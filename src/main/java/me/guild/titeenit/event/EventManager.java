@@ -246,8 +246,9 @@ public class EventManager implements Listener {
 
     /**
      * Ranks players by raw game score, awards event points by rank, and
-     * refreshes the tab scoreboard. Ties are broken arbitrarily.
-     * Points: 1st=12, 2nd=10, 3rd=8, 4th=7 … 10th=1.
+     * refreshes the tab scoreboard.
+     * Tied players share the average of the points for the ranks they span,
+     * rounded up. Points: 1st=12, 2nd=10, 3rd=8, 4th=7 … 10th=1.
      */
     private void accumulateRankedScores(Minigame game) {
         Map<UUID, Integer> rawScores = game.getScores();
@@ -257,17 +258,58 @@ public class EventManager implements Listener {
                 ? Map.Entry.comparingByValue()
                 : Map.Entry.<UUID, Integer>comparingByValue().reversed();
 
-        List<UUID> ranked = rawScores.entrySet().stream()
+        List<Map.Entry<UUID, Integer>> sorted = rawScores.entrySet().stream()
                 .sorted(cmp)
-                .map(Map.Entry::getKey)
                 .toList();
 
-        for (int i = 0; i < ranked.size(); i++) {
-            int pts = i < RANK_POINTS.length ? RANK_POINTS[i] : 1;
-            totalScores.merge(ranked.get(i), pts, Integer::sum);
+        // Compute points per player, averaging within tie groups (ceiling)
+        Map<UUID, Integer> awardedPts = new HashMap<>();
+        int i = 0;
+        while (i < sorted.size()) {
+            int j = i + 1;
+            while (j < sorted.size()
+                    && sorted.get(j).getValue().equals(sorted.get(i).getValue())) j++;
+            int sum = 0;
+            for (int k = i; k < j; k++) sum += k < RANK_POINTS.length ? RANK_POINTS[k] : 1;
+            int pts = (sum + (j - i) - 1) / (j - i); // ceiling division
+            for (int k = i; k < j; k++) awardedPts.put(sorted.get(k).getKey(), pts);
+            i = j;
         }
 
+        for (Map.Entry<UUID, Integer> e : awardedPts.entrySet()) {
+            totalScores.merge(e.getKey(), e.getValue(), Integer::sum);
+        }
         updateScoreboard();
+
+        String[] placeLabels = {"1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"};
+        broadcastAll(Component.text("=== " + game.getDisplayName() + " — Stage Results ===", NamedTextColor.GOLD));
+        i = 0;
+        while (i < sorted.size()) {
+            int j = i + 1;
+            while (j < sorted.size()
+                    && sorted.get(j).getValue().equals(sorted.get(i).getValue())) j++;
+            boolean tied = j - i > 1;
+            String placeBase = i < placeLabels.length ? placeLabels[i] : (i + 1) + "th";
+            String place = tied ? "T-" + placeBase : placeBase;
+            int pts = awardedPts.get(sorted.get(i).getKey());
+            for (int k = i; k < j; k++) {
+                UUID uid = sorted.get(k).getKey();
+                int total = totalScores.getOrDefault(uid, 0);
+                broadcastAll(Component.text(
+                        place + " " + resolveDisplayName(uid) + ": +" + pts + " pts  (total: " + total + ")",
+                        NamedTextColor.YELLOW));
+            }
+            i = j;
+        }
+    }
+
+    private String resolveDisplayName(UUID uuid) {
+        Optional<Guild> guild = guildRegistry.getGuild(uuid);
+        if (guild.isPresent()) return guild.get().getDisplayName();
+        Player p = plugin.getServer().getPlayer(uuid);
+        if (p != null) return p.getName();
+        var offline = plugin.getServer().getOfflinePlayer(uuid);
+        return offline.getName() != null ? offline.getName() : uuid.toString();
     }
 
     // -------------------------------------------------------------------------

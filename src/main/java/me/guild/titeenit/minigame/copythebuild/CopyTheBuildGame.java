@@ -94,7 +94,7 @@ public class CopyTheBuildGame extends Minigame {
                 CopyTheBuildConfig.CHECK_INTERVAL_TICKS, CopyTheBuildConfig.CHECK_INTERVAL_TICKS);
 
         broadcast(Component.text("Copy the Build has started! You have "
-                + CopyTheBuildConfig.GAME_DURATION_SECONDS / 60
+                + getTimerSeconds() / 60
                 + " minutes — copy the model structure to score!", NamedTextColor.GOLD));
     }
 

@@ -23,11 +23,9 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -44,7 +42,8 @@ import java.util.UUID;
 public class JallupolloGame extends Minigame {
     private final NamespacedKey potionKey;
     private final Map<UUID, Integer> scores = new HashMap<>();
-    private final Set<UUID> stunnedPlayers = new HashSet<>();
+    /** Epoch-ms at which each player's steal lockout expires. */
+    private final Map<UUID, Long> stunnedUntil = new HashMap<>();
     private final Random rng = new Random();
 
     // ---- hider state --------------------------------------------------------
@@ -94,7 +93,7 @@ public class JallupolloGame extends Minigame {
         if (gameTick != null) { gameTick.cancel(); gameTick = null; }
         org.bukkit.event.HandlerList.unregisterAll(listener);
 
-        stunnedPlayers.clear();
+        stunnedUntil.clear();
         if (hider != null && hider.isOnline()) {
             hider.removePotionEffect(PotionEffectType.SPEED);
             hider.removePotionEffect(PotionEffectType.SLOWNESS);
@@ -150,9 +149,6 @@ public class JallupolloGame extends Minigame {
             // Every 20 ticks = 1 second
             if (drinkTicks % 20 == 0) {
                 scores.merge(hider.getUniqueId(), JallupolloConfig.POINTS_PER_SECOND, Integer::sum);
-                hider.sendActionBar(Component.text(
-                        "+" + JallupolloConfig.POINTS_PER_SECOND + " pt  |  Total: "
-                                + scores.get(hider.getUniqueId()), NamedTextColor.GREEN));
 
                 playRevealSound();
 
@@ -177,6 +173,17 @@ public class JallupolloGame extends Minigame {
                     drinkTicks = 0;
                     stopGraceCounter = 0;
                 }
+            }
+        }
+
+        // Action bar: role + points for every participant
+        for (Player p : getOnlinePlayers()) {
+            int pts = scores.getOrDefault(p.getUniqueId(), 0);
+            if (p.equals(hider)) {
+                String tag = isDrinking ? "[Pöllö] ★ " : "[Pöllö] ";
+                p.sendActionBar(Component.text(tag + pts + " pts", NamedTextColor.RED));
+            } else {
+                p.sendActionBar(Component.text("[Seeker] " + pts + " pts", NamedTextColor.AQUA));
             }
         }
     }
@@ -255,10 +262,6 @@ public class JallupolloGame extends Minigame {
         if (caughtHider.isOnline()) {
             caughtHider.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS,
                     JallupolloConfig.STEAL_LOCKOUT_TICKS, 0, false, true, true));
-            UUID stunId = caughtHider.getUniqueId();
-            stunnedPlayers.add(stunId);
-            plugin.getServer().getScheduler().runTaskLater(plugin,
-                    () -> stunnedPlayers.remove(stunId), JallupolloConfig.STEAL_LOCKOUT_TICKS);
         }
 
         broadcast(Component.text(attacker.getName(), NamedTextColor.AQUA)
@@ -289,6 +292,12 @@ public class JallupolloGame extends Minigame {
         hiderSpeedStage = 0;
         hider.getInventory().addItem(createJaloviina());
         applyHiderSpeedEffect();
+
+        // Grace period: all seekers cannot steal for STEAL_LOCKOUT_TICKS
+        long stunExpiry = System.currentTimeMillis() + JallupolloConfig.STEAL_LOCKOUT_TICKS * 50L;
+        for (Player p : players) {
+            if (!p.equals(newHider)) stunnedUntil.put(p.getUniqueId(), stunExpiry);
+        }
 
         newHider.sendMessage(Component.text(
                 "You are the pöllö! Find a spot, then hold right-click on the Jaloviina to score points.",
@@ -359,7 +368,7 @@ public class JallupolloGame extends Minigame {
     public Player getHider() { return hider; }
 
     public boolean isStunned(Player player) {
-        return stunnedPlayers.contains(player.getUniqueId());
+        return stunnedUntil.getOrDefault(player.getUniqueId(), 0L) > System.currentTimeMillis();
     }
 
 }

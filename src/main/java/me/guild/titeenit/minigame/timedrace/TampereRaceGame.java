@@ -1,6 +1,8 @@
 package me.guild.titeenit.minigame.timedrace;
 
 import me.guild.titeenit.TiteeniPlugin;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -35,10 +37,20 @@ import java.util.UUID;
  * follows players up and down through the course. For intentional large
  * drops (e.g. a dropper funnel), place a pressure plate at the entry that
  * sets the spawn to the landing zone — the floor then drops with them.
+ *
+ * Scoring for DNF players: higher respawn Y = better rank (DNF scores are
+ * still ranked lower than any finisher).
  */
 public class TampereRaceGame extends TimedRaceGame implements Listener {
 
     private static final double FLOOR_OFFSET = 5.0;
+
+    /**
+     * Scores ≥ DNF_THRESHOLD belong to unfinished players (encoded as
+     * DNF_BASE − y * 1000 so that higher Y yields a lower/better score).
+     */
+    private static final int DNF_BASE      = 1_000_000_000;
+    private static final int DNF_THRESHOLD =   500_000_000;
 
     private final Map<UUID, Location> initialSpawns = new HashMap<>();
     /** Players currently mid-reset — suppresses re-entry for 1 second. */
@@ -50,6 +62,8 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
         super(plugin, players);
     }
 
+    @Override public int getTimerSeconds() { return 360; }
+
     @Override
     public void start() {
         super.start();
@@ -59,7 +73,6 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
             Location spawn = p.getLocation().clone();
             initialSpawns.put(p.getUniqueId(), spawn);
             p.setRespawnLocation(spawn, true);
-            p.setCollidable(false);
             applyEffects(p);
         }
     }
@@ -69,14 +82,63 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
         HandlerList.unregisterAll(this);
         for (Player p : getOnlinePlayers()) {
             p.removePotionEffect(PotionEffectType.INVISIBILITY);
-            p.setCollidable(true);
         }
         restoreInventories();
-        initialSpawns.clear();
         resetting.clear();
         boarded.clear();
-        super.stop();
+        super.stop();           // calls broadcastScores() → getScores() which needs initialSpawns
+        initialSpawns.clear();  // safe to clear only after super.stop()
     }
+
+    // -------------------------------------------------------------------------
+    // Scoring
+    // -------------------------------------------------------------------------
+
+    /**
+     * Finishers: their elapsed milliseconds (lower = better).
+     * Unfinished online players: DNF_BASE − y*1000 (still > any finish time).
+     * Unfinished offline players: Integer.MAX_VALUE (worst rank).
+     */
+    @Override
+    public Map<UUID, Integer> getScores() {
+        Map<UUID, Integer> scores = new HashMap<>(super.getScores());
+        for (Player p : players) {
+            UUID uid = p.getUniqueId();
+            if (scores.get(uid) < DNF_THRESHOLD) continue; // already finished
+            if (!p.isOnline()) continue;                    // stays at MAX_VALUE
+            Location checkpoint = p.getRespawnLocation();
+            if (checkpoint == null) checkpoint = initialSpawns.get(uid);
+            int y = checkpoint != null ? (int) checkpoint.getY() : 0;
+            scores.put(uid, DNF_BASE - y * 1000);
+        }
+        return java.util.Collections.unmodifiableMap(scores);
+    }
+
+    @Override
+    protected void broadcastScores() {
+        showTopPerformersTitle();
+        broadcastAll(Component.text("=== " + getDisplayName() + " — Final Scores ===", NamedTextColor.GOLD));
+        getScores().entrySet().stream()
+                .sorted(Map.Entry.comparingByValue())  // lower = better
+                .forEach(entry -> {
+                    int score = entry.getValue();
+                    String result;
+                    if (score < DNF_THRESHOLD) {
+                        result = formatTime(score);
+                    } else if (score == Integer.MAX_VALUE) {
+                        result = "DNF";
+                    } else {
+                        int y = (DNF_BASE - score) / 1000;
+                        result = "DNF (Y=" + y + ")";
+                    }
+                    broadcastAll(Component.text(
+                            displayName(entry.getKey()) + ": " + result, NamedTextColor.YELLOW));
+                });
+    }
+
+    // -------------------------------------------------------------------------
+    // Events
+    // -------------------------------------------------------------------------
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
@@ -134,7 +196,6 @@ public class TampereRaceGame extends TimedRaceGame implements Listener {
     public void onPlayerBoarded(Player player) {
         boarded.add(player.getUniqueId());
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
-        player.setCollidable(true);
         restoreInventory(player);
         super.onPlayerBoarded(player);
     }

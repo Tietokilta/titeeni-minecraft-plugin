@@ -50,6 +50,7 @@ public class ShootingGalleryGame extends Minigame {
 
     @Override
     public String getDisplayName() { return "Toripoliisi battle"; }
+    @Override public int getTimerSeconds() { return 240; }
 
     @Override
     public void start() {
@@ -63,7 +64,7 @@ public class ShootingGalleryGame extends Minigame {
         for (Player p : getOnlinePlayers()) {
             plugin.getGuildRegistry().getGuild(p).ifPresent(guild ->
                     locationConfig.getStageLocation(EventStage.OULU, guild).ifPresent(loc ->
-                            p.setBedSpawnLocation(loc, true)));
+                            p.setRespawnLocation(loc, true)));
             p.getInventory().addItem(bow.clone());
             p.getInventory().addItem(arrow.clone());
             p.getInventory().setHelmet(new ItemStack(Material.IRON_HELMET));
@@ -151,7 +152,7 @@ public class ShootingGalleryGame extends Minigame {
                     Entity zombie = spawnLoc.getWorld().spawnEntity(spawnLoc, EntityType.ZOMBIE);
                     if (zombie instanceof Zombie z) {
                         z.setAdult();
-                        z.getEquipment().setHelmet(new ItemStack(Material.LEATHER_HELMET));
+                        z.getEquipment().setHelmet(new ItemStack(Material.DIAMOND_HELMET));
                         z.getEquipment().setHelmetDropChance(0f);
                         AttributeInstance range = z.getAttribute(Attribute.FOLLOW_RANGE);
                         if (range != null) range.setBaseValue(256.0);
@@ -160,8 +161,9 @@ public class ShootingGalleryGame extends Minigame {
                 }
             }
         });
-        int total = hitTargets.size();
-        broadcast(Component.text(shooter.getName(), NamedTextColor.AQUA)
-                .append(Component.text(" blew up a target! (" + total + " destroyed so far)", NamedTextColor.GREEN)));
+        if (newScore % 10 == 0) {
+            broadcast(Component.text(shooter.getName(), NamedTextColor.AQUA)
+                .append(Component.text(" blew up a target! (" + newScore + " destroyed so far)", NamedTextColor.GREEN)));
+        }
     }
 }

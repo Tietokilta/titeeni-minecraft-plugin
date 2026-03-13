@@ -4,9 +4,6 @@ public final class CopyTheBuildConfig {
 
     private CopyTheBuildConfig() {}
 
-    /** Game duration in seconds. */
-    public static final int GAME_DURATION_SECONDS = 300;
-
     public static final int PLOT_SIZE = 5;
     public static final int PLOT_HEIGHT = 15;
 
