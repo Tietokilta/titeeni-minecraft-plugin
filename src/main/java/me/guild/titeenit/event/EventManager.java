@@ -63,6 +63,8 @@ public class EventManager implements Listener {
     private boolean advancing = false;
     private final Set<UUID> playersOnBus = new HashSet<>();
     private final Map<UUID, Integer> totalScores = new HashMap<>();
+    /** UUID of the admin who receives overall event scoring messages. Null if not set. */
+    private UUID adminUuid = null;
 
     // Tab-list scoreboard
     private final Scoreboard scoreboard;
@@ -83,6 +85,12 @@ public class EventManager implements Listener {
         tabObjective.setDisplaySlot(DisplaySlot.PLAYER_LIST);
 
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+
+        // Load persisted admin UUID
+        String savedAdmin = plugin.getConfig().getString("event.adminUuid");
+        if (savedAdmin != null) {
+            try { adminUuid = UUID.fromString(savedAdmin); } catch (IllegalArgumentException ignored) {}
+        }
 
         // Keep all assigned players permanently fed — refresh every 2 s, no particles
         plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
@@ -282,7 +290,7 @@ public class EventManager implements Listener {
         updateScoreboard();
 
         String[] placeLabels = {"1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"};
-        broadcastAll(Component.text("=== " + game.getDisplayName() + " — Stage Results ===", NamedTextColor.GOLD));
+        sendToAdmin(Component.text("=== " + game.getDisplayName() + " — Stage Results ===", NamedTextColor.GOLD));
         i = 0;
         while (i < sorted.size()) {
             int j = i + 1;
@@ -295,7 +303,7 @@ public class EventManager implements Listener {
             for (int k = i; k < j; k++) {
                 UUID uid = sorted.get(k).getKey();
                 int total = totalScores.getOrDefault(uid, 0);
-                broadcastAll(Component.text(
+                sendToAdmin(Component.text(
                         place + " " + resolveDisplayName(uid) + ": +" + pts + " pts  (total: " + total + ")",
                         NamedTextColor.YELLOW));
             }
@@ -540,8 +548,7 @@ public class EventManager implements Listener {
                 .sorted(Map.Entry.<UUID, Integer>comparingByValue().reversed())
                 .toList();
 
-        plugin.getServer().broadcast(Component.text(
-                "═══════════ FINAL RESULTS ═══════════", NamedTextColor.GOLD));
+        sendToAdmin(Component.text("═══════════ FINAL RESULTS ═══════════", NamedTextColor.GOLD));
         for (int i = 0; i < sorted.size(); i++) {
             UUID uid = sorted.get(i).getKey();
             int pts = sorted.get(i).getValue();
@@ -556,11 +563,23 @@ public class EventManager implements Listener {
                 case 2 -> NamedTextColor.DARK_RED;
                 default -> NamedTextColor.WHITE;
             };
-            plugin.getServer().broadcast(Component.text(
+            sendToAdmin(Component.text(
                     place + playerName + " (" + guildName + ") — " + pts + " pts", color));
         }
-        plugin.getServer().broadcast(Component.text(
-                "═════════════════════════════════════", NamedTextColor.GOLD));
+        sendToAdmin(Component.text("═════════════════════════════════════", NamedTextColor.GOLD));
+    }
+
+    public void setAdmin(UUID uuid) {
+        this.adminUuid = uuid;
+        plugin.getConfig().set("event.adminUuid", uuid.toString());
+        plugin.saveConfig();
+    }
+
+    /** Sends a message only to the configured admin player (if online). */
+    private void sendToAdmin(Component message) {
+        if (adminUuid == null) return;
+        Player admin = plugin.getServer().getPlayer(adminUuid);
+        if (admin != null) admin.sendMessage(message);
     }
 
     private void broadcastAll(Component message) {

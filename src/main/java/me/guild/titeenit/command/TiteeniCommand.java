@@ -37,7 +37,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
     private static final List<String> BASE_SUB_COMMANDS = List.of(
             "score",
             "assign", "unassign", "setlocation", "setbus", "setkoth", "setturkugate", "advance", "end", "board", "totalscore",
-            "goto"
+            "goto", "setadmin"
     );
 
     private static final List<String> GUILD_NAMES = Arrays.stream(Guild.values())
@@ -99,6 +99,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
             case "board"         -> handleBoard(sender, args);
             case "totalscore"    -> handleTotalScore(sender);
             case "goto"          -> handleGoto(sender, args);
+            case "setadmin"      -> handleSetAdmin(sender, args);
             default -> {
                 String sub = args[0].toLowerCase();
                 for (MinigameCommandHandler handler : handlers) {
@@ -337,6 +338,22 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
                 () -> sender.sendMessage(Component.text(
                         "No spawn configured for " + stage.getDisplayName() + " / " + guild.getDisplayName() + ".",
                         NamedTextColor.RED)));
+    }
+
+    private void handleSetAdmin(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /titeeni setadmin <player>", NamedTextColor.RED));
+            return;
+        }
+        Player target = plugin.getServer().getPlayer(args[1]);
+        if (target == null) {
+            sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
+            return;
+        }
+        eventManager.setAdmin(target.getUniqueId());
+        sender.sendMessage(Component.text(
+                target.getName() + " is now the event admin (receives overall scoring).",
+                NamedTextColor.GREEN));
     }
 
     private void handleTotalScore(CommandSender sender) {
