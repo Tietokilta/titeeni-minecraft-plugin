@@ -4,13 +4,13 @@ import java.util.Optional;
 
 public enum EventStage {
     TURKU(   "Turku",           "Race to the finish",                         "boatrace"),
-    TAMPERE( "Tampere",         "Complete the parkour and board the bus",      "tampererace"),
+    TAMPERE( "Tampere",         "Complete the parkour",      "tampererace"),
     VAASA(   "Vaasa",           "Trade up the item chain",                     "tradeup"),
-    OULU(    "Oulu",            "Shoot the targets",                           "shootinggallery"),
-    JYVASKYLA("Jyväskylä",     "Find the hidden buttons to score",            "findthebutton"),
-    LAPPEENRANTA("Lappeenranta","Replicate the model structure to score",      "copythebuild"),
+    OULU(    "Oulu",            "Shoot the targets and defeat Toripoliisi",                           "shootinggallery"),
+    JYVASKYLA("Jyväskylä",     "Find the hidden buttons",            "findthebutton"),
+    LAPPEENRANTA("Lappeenranta","Replicate the model structure",      "copythebuild"),
     LAHTI(   "Lahti",           "King of the Hill",                      "kingofthehill"),
-    OTANIEMI("Otaniemi",        "Play jallupöllö","jallupollo");
+    OTANIEMI("Otaniemi",        "Play Jallupöllö","jallupollo");
 
     private final String displayName;
     private final String subtitle;

@@ -95,9 +95,8 @@ public class FindTheButtonGame extends Minigame {
             int score = scores.get(player.getUniqueId());
             if (score % 10 == 0) {
                 broadcast(Component.text(player.getName(), NamedTextColor.AQUA)
-                    .append(Component.text(" found a button! (", NamedTextColor.GREEN))
-                    .append(Component.text(scores.get(player.getUniqueId()) + " pts", NamedTextColor.YELLOW))
-                    .append(Component.text(")", NamedTextColor.GREEN)));
+                    .append(Component.text(" has reached ", NamedTextColor.GREEN))
+                    .append(Component.text(scores.get(player.getUniqueId()) + " pts", NamedTextColor.YELLOW)));
             }
         }, 15L);
     }

@@ -172,7 +172,7 @@ public class ShootingGalleryGame extends Minigame {
         });
         if (newScore % 10 == 0) {
             broadcast(Component.text(shooter.getName(), NamedTextColor.AQUA)
-                .append(Component.text(" blew up a target! (" + newScore + " destroyed so far)", NamedTextColor.GREEN)));
+                .append(Component.text(" has hit " + newScore + " targets so far!", NamedTextColor.GREEN)));
         }
     }
 }
