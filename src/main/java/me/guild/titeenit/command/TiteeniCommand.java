@@ -281,7 +281,7 @@ public class TiteeniCommand implements CommandExecutor, TabCompleter {
 
     private void handleBoard(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /titeeni board <player>", NamedTextColor.RED));
+            eventManager.autoBoardRemaining();
             return;
         }
         Player target;
