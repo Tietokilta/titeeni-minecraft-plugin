@@ -113,6 +113,15 @@ public class ShootingGalleryGame extends Minigame {
     @Override
     public Map<UUID, Integer> getScores() { return Collections.unmodifiableMap(scores); }
 
+    @Override
+    public void onTimerTick(int secondsLeft) {
+        for (Player p : getOnlinePlayers()) {
+            int score = scores.getOrDefault(p.getUniqueId(), 0);
+            p.sendActionBar(Component.text(
+                    score + " pts  |  " + formatRemaining(secondsLeft), NamedTextColor.YELLOW));
+        }
+    }
+
     // =========================================================================
     // Called by listener
     // =========================================================================
