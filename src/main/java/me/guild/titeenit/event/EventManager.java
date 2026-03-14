@@ -583,8 +583,9 @@ public class EventManager implements Listener {
         plugin.saveConfig();
     }
 
-    /** Sends a message only to the configured admin player (if online). */
+    /** Sends a message to the configured admin player (if online) and the server console. */
     private void sendToAdmin(Component message) {
+        plugin.getServer().getConsoleSender().sendMessage(message);
         if (adminUuid == null) return;
         Player admin = plugin.getServer().getPlayer(adminUuid);
         if (admin != null) admin.sendMessage(message);
