@@ -62,6 +62,7 @@ public class TradeUpGame extends Minigame {
     private final Map<UUID, Long>    positionAchievedAt = new HashMap<>();
     private long startTimeMs;
     private BukkitTask tickTask;
+    private final TradeUpListener listener = new TradeUpListener(this);
 
     public TradeUpGame(TiteeniPlugin plugin, List<Player> players) {
         super(plugin, players);
@@ -82,6 +83,8 @@ public class TradeUpGame extends Minigame {
             p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, Integer.MAX_VALUE, 4, false, false));
         }
 
+        plugin.getServer().getPluginManager().registerEvents(listener, plugin);
+
         // Check inventories every second: update position tracking + auto-board on emerald
         tickTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::checkInventories, 20L, 20L);
 
@@ -96,6 +99,7 @@ public class TradeUpGame extends Minigame {
         state = MinigameState.ENDED;
 
         if (tickTask != null) { tickTask.cancel(); tickTask = null; }
+        org.bukkit.event.HandlerList.unregisterAll(listener);
 
         long now = System.currentTimeMillis();
         int timerMs = getTimerSeconds() * 1000;
