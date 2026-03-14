@@ -25,11 +25,6 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import io.papermc.paper.event.player.AsyncChatEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.scoreboard.Criteria;
-import org.bukkit.scoreboard.DisplaySlot;
-import org.bukkit.scoreboard.Objective;
-import org.bukkit.scoreboard.Scoreboard;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -66,23 +61,12 @@ public class EventManager implements Listener {
     /** UUID of the admin who receives overall event scoring messages. Null if not set. */
     private UUID adminUuid = null;
 
-    // Tab-list scoreboard
-    private final Scoreboard scoreboard;
-    private final Objective tabObjective;
-
     public EventManager(TiteeniPlugin plugin, MinigameManager minigameManager,
                         GuildRegistry guildRegistry, EventLocationConfig locationConfig) {
         this.plugin = plugin;
         this.minigameManager = minigameManager;
         this.guildRegistry = guildRegistry;
         this.locationConfig = locationConfig;
-
-        // Set up the persistent tab-list scoreboard
-        scoreboard = plugin.getServer().getScoreboardManager().getNewScoreboard();
-        tabObjective = scoreboard.registerNewObjective(
-                "event_pts", Criteria.DUMMY,
-                Component.text("Event pts", NamedTextColor.GOLD));
-        tabObjective.setDisplaySlot(DisplaySlot.PLAYER_LIST);
 
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
 
@@ -116,7 +100,12 @@ public class EventManager implements Listener {
             return;
         }
         playersOnBus.add(player.getUniqueId());
-        locationConfig.getBusLocation().ifPresent(player::teleport);
+        boolean isFinalStage = currentStage != null && currentStage.next().isEmpty();
+        if (isFinalStage) {
+            player.setGameMode(org.bukkit.GameMode.CREATIVE);
+        } else {
+            locationConfig.getBusLocation().ifPresent(player::teleport);
+        }
 
         // Let the active minigame react (e.g. TimedRaceGame records finish time)
         Minigame currentGame = minigameManager.getCurrentGame();
@@ -295,8 +284,6 @@ public class EventManager implements Listener {
         for (Map.Entry<UUID, Integer> e : awardedPts.entrySet()) {
             totalScores.merge(e.getKey(), e.getValue(), Integer::sum);
         }
-        updateScoreboard();
-
         String[] placeLabels = {"1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"};
         sendToAdmin(Component.text("=== " + game.getDisplayName() + " — Stage Results ===", NamedTextColor.GOLD));
         i = 0;
@@ -328,38 +315,9 @@ public class EventManager implements Listener {
         return offline.getName() != null ? offline.getName() : uuid.toString();
     }
 
-    // -------------------------------------------------------------------------
-    // Scoreboard
-    // -------------------------------------------------------------------------
-
-    private void updateScoreboard() {
-        for (Map.Entry<UUID, Integer> entry : totalScores.entrySet()) {
-            Player p = plugin.getServer().getPlayer(entry.getKey());
-            if (p == null) continue;
-            tabObjective.getScore(p.getName()).setScore(entry.getValue());
-        }
-        // Ensure all online players see this scoreboard
-        for (Player p : plugin.getServer().getOnlinePlayers()) {
-            if (!p.getScoreboard().equals(scoreboard)) {
-                p.setScoreboard(scoreboard);
-            }
-        }
-    }
-
     @EventHandler
     public void onChat(AsyncChatEvent event) {
         event.setCancelled(true);
-    }
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        Player p = event.getPlayer();
-        p.setScoreboard(scoreboard);
-        // Restore their score entry if they already have points
-        Integer score = totalScores.get(p.getUniqueId());
-        if (score != null) {
-            tabObjective.getScore(p.getName()).setScore(score);
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -391,9 +349,6 @@ public class EventManager implements Listener {
         currentStage = null;
         advancing = false;
         playersOnBus.clear();
-        for (String entry : scoreboard.getEntries()) {
-            scoreboard.resetScores(entry);
-        }
         totalScores.clear();
     }
 
