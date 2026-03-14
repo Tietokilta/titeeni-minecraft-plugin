@@ -176,14 +176,17 @@ public class JallupolloGame extends Minigame {
             }
         }
 
-        // Action bar: role + points for every participant
+    }
+
+    @Override
+    public void onTimerTick(int secondsLeft) {
         for (Player p : getOnlinePlayers()) {
             int pts = scores.getOrDefault(p.getUniqueId(), 0);
             if (p.equals(hider)) {
                 String tag = isDrinking ? "[Pöllö] ★ " : "[Pöllö] ";
-                p.sendActionBar(Component.text(tag + pts + " pts", NamedTextColor.RED));
+                p.sendActionBar(Component.text(tag + pts + " pts  |  " + formatRemaining(secondsLeft), NamedTextColor.RED));
             } else {
-                p.sendActionBar(Component.text("[Seeker] " + pts + " pts", NamedTextColor.AQUA));
+                p.sendActionBar(Component.text("[Seeker] " + pts + " pts  |  " + formatRemaining(secondsLeft), NamedTextColor.AQUA));
             }
         }
     }
