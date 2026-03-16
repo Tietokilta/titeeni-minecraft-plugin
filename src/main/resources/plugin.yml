@@ -7,7 +7,7 @@ description: Titeeni minigame plugin
 commands:
   titeeni:
     description: Titeeni minecraft event management commands
-    usage: /titeeni <start|stop|score|sethider>
+    usage: /titeeni <command>
     permission: titeeni.admin
 
 permissions:
