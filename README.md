@@ -1,6 +1,6 @@
 # TiteeniPlugin
 
-Paper plugin for the Titeenien Taisto Minecraft event. Manages a 9-stage overarching event where 10 players, each representing a Finnish CS guild, compete for points across multiple minigames.
+Paper plugin for the Titeenien Taisto Minecraft event. Manages an 8-stage overarching event where 10 players, each representing a Finnish CS guild, compete for points across multiple minigames.
 
 ## Requirements
 
@@ -18,19 +18,18 @@ Output: `target/TiteeniPlugin-1.0.0.jar`
 
 ## Event overview
 
-The event follows nine Finnish university cities in order. Players travel between stages on a shared bus. An admin manually advances the event; minigame stages start automatically on advancement.
+The event follows eight Finnish university cities in order. Players travel between stages on a shared bus. An admin manually advances the event; minigame stages start automatically on advancement.
 
 | # | City | Activity | Scoring |
 |---|---|---|---|
-| 1 | Ainoa (Tapiola) | Maze escape | Timed race |
-| 2 | Turku | Ice boating race | Timed race |
-| 3 | Tampere | Parkour | Timed race |
-| 4 | Vaasa | Deliver packages | — (no plugin) |
-| 5 | Oulu | Kill a wither | — (no plugin) |
-| 6 | Jyväskylä | Find the Button | Buttons found |
-| 7 | Lappeenranta | Copy the Build | Builds completed |
-| 8 | Lahti | King of the Hill | Points scored on hill |
-| 9 | Otaniemi | Jallupöllö | Points scored as hider |
+| 1 | Turku | Ice boating race | Timed race |
+| 2 | Tampere | Parkour | Timed race |
+| 3 | Vaasa | Trade Up item chain | Items traded |
+| 4 | Oulu | Shoot targets & defeat Toripoliisi | Targets hit |
+| 5 | Jyväskylä | Find the Button | Buttons found |
+| 6 | Lappeenranta | Copy the Build | Builds completed |
+| 7 | Lahti | King of the Hill | Points scored on hill |
+| 8 | Otaniemi | Jallupöllö | Points scored as hider |
 
 ### Event scoring
 
@@ -49,9 +48,9 @@ After each stage, guilds are ranked by their raw game score and awarded event po
 | 9th | 2 |
 | 10th | 1 |
 
-For **timed races** (Ainoa, Tampere, Turku), the fastest finisher ranks 1st. Boarding the bus stops a player's individual timer. Players who do not finish receive last place.
+Tied players share the average of the points for the ranks they span (rounded up).
 
-The running total is always visible in the **tab list** (player list scoreboard) and via `/titeeni totalscore`.
+Stage results and the running total are sent to the designated admin player (set with `/titeeni setadmin`) and to the server console. Use `/titeeni totalscore` to show accumulated points at any time.
 
 ## Guilds
 
@@ -82,7 +81,15 @@ All setup commands require op (`titeeni.admin`). Location commands use your curr
 ...repeat for all 10 guilds...
 ```
 
-### 2. Set the bus location
+### 2. Set the designated admin
+
+The admin player receives per-stage scoring results and the final leaderboard in chat.
+
+```
+/titeeni setadmin PlayerName
+```
+
+### 3. Set the bus location
 
 Stand at the spot where players wait between stages and run:
 
@@ -90,7 +97,7 @@ Stand at the spot where players wait between stages and run:
 /titeeni setbus
 ```
 
-### 3. Set spawn locations per stage and guild
+### 4. Set spawn locations per stage and guild
 
 For each stage and each guild, stand at that guild's starting position for that stage and run:
 
@@ -98,7 +105,9 @@ For each stage and each guild, stand at that guild's starting position for that 
 /titeeni setlocation <STAGE> <GUILD>
 ```
 
-Stage names (case-insensitive): `AINOA`, `LAHTI`, `LAPPEENRANTA`, `JYVASKYLA`, `OULU`, `VAASA`, `TAMPERE`, `TURKU`, `OTANIEMI`
+If `<GUILD>` is omitted, your current position is set for all guilds at once.
+
+Stage names (case-insensitive): `TURKU`, `TAMPERE`, `VAASA`, `OULU`, `JYVASKYLA`, `LAPPEENRANTA`, `LAHTI`, `OTANIEMI`
 
 Example:
 ```
@@ -107,9 +116,19 @@ Example:
 ...
 ```
 
-Timed race stages (Ainoa, Tampere, Turku) start an automatic timer when the stage begins. Oulu, Vaasa are no-plugin stages that still use the configured spawn to teleport players from the bus.
+Use `/titeeni goto <stage> <guild>` to teleport to a saved spawn and verify placement.
 
-### 4. Configure King of the Hill (Lahti)
+### 5. Set the Turku boat gate
+
+Stand at the finish-line gate (the Z coordinate where players may leave their boat) and run:
+
+```
+/titeeni setturkugate
+```
+
+Players cannot board the bus from a boat that is still behind this Z coordinate.
+
+### 6. Configure King of the Hill (Lahti)
 
 ```
 /titeeni setkoth <y>
@@ -117,74 +136,92 @@ Timed race stages (Ainoa, Tampere, Turku) start an automatic timer when the stag
 
 Sets the Y level that counts as "on the hill" for scoring.
 
-### 5. Configure Copy the Build (Lappeenranta)
+### 7. Configure Oulu shooting gallery
 
-Register model structures — stand at the north-west-bottom corner of each pre-built 5×5×5 model and run:
+For each guild, stand at the location where zombies should spawn for that guild's player and run:
+
+```
+/titeeni setzombiespawn <GUILD>
+```
+
+Repeat for all guilds. Zombie spawns are saved to config.
+
+### 8. Configure Copy the Build (Lappeenranta)
+
+Register model structures — stand at the north-west-bottom corner of each pre-built 5×5×15 model and run:
 
 ```
 /titeeni setplot model
 ```
 
-Register each guild's build area — stand at the north-west-bottom corner of their empty 5×5×5 plot and run:
+Register each guild's build area — stand at the north-west-bottom corner of their empty 5×5×15 plot and run:
 
 ```
 /titeeni setplot build <GUILD>
 ```
 
-The game automatically places a **preview plot** 10 blocks behind each build area (+Z: 5 blocks for the plot + 5 block gap). Make sure that space is clear.
+The game automatically places a **preview plot** next to each build area (+X: 5 blocks for the plot + 3 block gap). Make sure that space is clear.
 
-### 6. Set up the bus pressure plate
+### 9. Set up the bus pressure plate
 
 Place a pressure plate at the bus entrance connected to a command block that runs:
 
 ```
-/titeeni board <player>
+/titeeni board @p
 ```
 
-`<player>` should resolve to the player who stepped on the plate (e.g. using a command block with `@p`).
+`@p` resolves to the player who stepped on the plate.
 
 ## Running the event
 
 ```
-/titeeni advance         ← teleports all bus players to AINOA, no minigame starts
+/titeeni advance         ← teleports all assigned players to the first event (TURKU), boat race begins
 ```
 
 Players complete the current activity, then walk onto the pressure plate to board the bus.
 
 ```
-/titeeni advance         ← teleports to LAHTI, King of the Hill starts automatically
+/titeeni advance         ← teleports all players to the next event, also boards them on the bus if missing
 ```
 
-The minigame runs until it ends naturally (timer expires) or you stop it manually with `/titeeni stop`. Players then board the bus, and you run `/titeeni advance` again for the next stage.
+The minigame runs until it ends naturally (timer expires or all players finish) or you advance to the next one.
 
+To jump to a specific stage (e.g. for testing):
 ```
-/titeeni totalscore      ← show accumulated points including the current game
+/titeeni advance tampere
 ```
 
 ## Commands
 
-All commands require op (permission `titeeni.admin`).
+All commands require op (permission `titeeni.admin`). Chat is disabled for all non-op players during the event.
+
+All configuration changes are saved to `TiteeniPlugin/config.yml` and persist over resets.
 
 ### Event management
 
 | Command | Description |
 |---|---|
 | `/titeeni assign <guild> <player>` | Assign an online player to a guild |
-| `/titeeni setlocation <stage> <guild>` | Save your current position as the guild's spawn for a stage |
+| `/titeeni unassign <player>` | Remove a player from all guilds |
+| `/titeeni setadmin <player>` | Designate who receives scoring messages in chat |
+| `/titeeni setlocation <stage> [guild]` | Save your position as the guild's spawn for a stage (all guilds if omitted) |
 | `/titeeni setbus` | Save your current position as the bus location |
-| `/titeeni setkoth <y>` | Set the King of the Hill Y level (Lahti) |
-| `/titeeni advance` | Advance to the next stage — teleports bus players and starts the minigame |
-| `/titeeni board <player>` | Mark a player as on the bus (intended for command block use) |
+| `/titeeni goto <stage> <guild>` | Teleport to a configured stage spawn |
+| `/titeeni advance [stage]` | Advance to the next (or a specific) stage — teleports bus players and starts the minigame |
+| `/titeeni end` | End the event early and reset state |
+| `/titeeni board [player]` | Mark a player as on the bus; omit player to board all remaining |
 | `/titeeni totalscore` | Show accumulated event scores across all completed stages |
 
 ### Minigame control
 
 | Command | Description |
 |---|---|
-| `/titeeni start <game>` | Manually start a minigame with guild-assigned players |
-| `/titeeni stop` | Stop the current game |
 | `/titeeni score` | Show scores for the current game |
+| `/titeeni stop` | Stop the current game |
 | `/titeeni sethider <player>` | Manually set the hider (Jallupöllö only) |
+| `/titeeni setkoth <y>` | Set the King of the Hill Y level (Lahti) |
+| `/titeeni setturkugate` | Save your current Z as the Turku boat gate (players cannot leave their boat before this Z) |
+| `/titeeni setzombiespawn <guild>` | Save your position as the zombie spawn for a guild (Oulu) |
 | `/titeeni setplot model` | Register a model plot corner (Copy the Build) |
 | `/titeeni setplot build <guild>` | Register a build plot corner for a guild (Copy the Build) |
 
@@ -193,24 +230,35 @@ All commands require op (permission `titeeni.admin`).
 
 ### Timed Race
 
-Used for Ainoa (maze), Tampere (parkour), and Turku (ice boating). The plugin starts a shared timer when the stage begins. Each player's individual clock stops the moment they board the bus at the finish.
+Used for Turku (ice boating) and Tampere (parkour). The plugin starts a shared timer when the stage begins. Each player's individual clock stops the moment they board the bus at the finish.
 
 - Your elapsed time is shown in the action bar in real time
 - Once you finish, the action bar shows your final time in green
-- Players who do not finish (disconnect or quit) receive last place
-- The game ends automatically when all participants have finished; otherwise stop it with `/titeeni stop`
+- Players who do not finish receive last place
 
-These stages start automatically via `/titeeni advance` — no separate `/titeeni start` needed.
+**Tampere DNF ranking:** players who do not finish before the timer are ranked by the Y level of their last reached checkpoint — the further through the parkour, the better the rank. This correctly separates players who made different amounts of progress.
 
-### Jallupöllö
+### Trade Up (Vaasa)
 
-Hide-and-seek variant. One player is the **pöllö** (hider), the rest are seekers.
+Players race to trade a single **Book** up a chain of items as far as possible, using pre-configured villagers on the map. Higher position in the chain = better rank; time of achievement breaks ties within the same position.
 
-- The hider receives a **Jaloviina** bottle — hold right-click to drink and score 1 point per second
-- Drinking broadcasts a positional sound to all seekers and updates their compass when stopped
-- A seeker who hits the hider becomes the new pöllö; nearby seekers are briefly stunned
+Chain: Book → Diamond → Lantern → 2× Oak Log → Gold Block → Iron Sword → Cooked Porkchop → Fishing Rod → Diamond Axe → **Emerald**
 
-**Start:** `/titeeni start jallupollo` (minimum 2 players)
+- Each player starts with one Book and Speed V
+- Reaching the Emerald automatically boards you on the bus
+- Item drops are disabled
+- Game ends after 5 minutes or when all players finish
+
+### Shooting Gallery (Oulu)
+
+Players fight waves of Toripoliisi zombies in a 4-minute shooting gallery. Each player receives a Bow (Infinity) and iron armour.
+
+- Shoot the target blocks on the map to score points and spawn zombies
+- Every hit explodes a small sphere of blocks (restored at game end) and spawns zombies at your guild's zombie spawn point
+- Zombie count per hit scales with your score (1 + score/10), so the arena gets harder as you improve
+- Score is the number of target blocks you hit
+
+Setup: register a zombie spawn for each guild with `/titeeni setzombiespawn <guild>`.
 
 ### Find the Button
 
@@ -219,7 +267,15 @@ Players explore the map and click hidden buttons to score points. First to find 
 - Right-click a button to claim it — the button disappears and you score 1 point
 - Buttons are restored when the game ends
 
-**Start:** `/titeeni start findthebutton`
+### Copy the Build
+
+Players race to replicate a pre-built 5×5×15 model structure in their own designated build area. Complete as many models as possible in 8 minutes.
+
+- Each player receives exactly the blocks needed to match the current model
+- Breaking a block in your area returns it to your inventory instead of dropping it
+- When your build matches the model you score 1 point, your area clears, and you receive blocks for the next model
+- Models cycle — if there are multiple registered models each completion advances to the next
+- You cannot place or break blocks outside the building area
 
 ### King of the Hill
 
@@ -229,36 +285,14 @@ Players compete to occupy the highest point. PvP is enabled with bare-fist knock
 - Players at or above the specified Y level score 1 point per second
 - Fall damage is cancelled so getting knocked off is repositioning, not punishment
 - Action bar shows a live top-3 leaderboard and your distance to the hill
-- Game ends after 5 minutes
+- Game ends after 3 minutes
 
-**Start:** `/titeeni start kingofthehill <y>` (minimum 2 players, e.g. `koth 120`)
 
-### Copy the Build
+### Jallupöllö
 
-Players race to replicate a pre-built 5×5×5 model structure in their own designated build area. Complete as many models as possible in 5 minutes.
+Hide-and-seek variant. One player is the **pöllö** (hider), the rest are seekers.
 
-- Each player receives exactly the blocks needed to match the current model
-- Breaking a block in your area returns it to your inventory instead of dropping it
-- When your build matches the model you score 1 point, your area clears, and you receive blocks for the next model
-- Models cycle — if there are multiple registered models each completion advances to the next
-- You cannot place or break blocks in the model area
-
-**Setup (one-time, per server world):**
-
-1. Build the first 5×5×5 model structure. Stand at its **north-west-bottom corner** and run:
-   ```
-   /titeeni setplot model
-   ```
-   Repeat for each additional model (players cycle through them in order).
-
-2. For each player, stand at the **north-west-bottom corner** of their empty 5×5×5 build area and run:
-   ```
-   /titeeni setplot build <player>
-   ```
-   Only players with a registered build plot join the game — running this command is how you control who participates. Re-running it for the same player moves their plot rather than creating a duplicate.
-
-   The game automatically places a **preview plot** 10 blocks behind each build area (along the +Z axis: 5 blocks for the plot itself + 5 block gap). The preview shows a live copy of the model the player is currently trying to replicate, updating whenever they complete a build. Make sure that 5×5×5 space is clear of anything you want to keep.
-
-   Plot locations are saved in `plugins/TiteeniPlugin/config.yml` and persist across restarts.
-
-**Start:** `/titeeni start copythebuild` (alias: `ctb`)
+- The hider receives a **Jaloviina** bottle — hold right-click to drink and score 1 point per second
+- Drinking broadcasts a positional sound to all seekers and gives the drinker a glow effect
+- A seeker who hits the hider becomes the new pöllö, and they gain speed 10 for 10 seconds
+- A pöllö who is not drinking gets increasingly slower every 10 seconds they do not drink
