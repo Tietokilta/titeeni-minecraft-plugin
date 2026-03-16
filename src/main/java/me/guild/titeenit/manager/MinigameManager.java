@@ -70,9 +70,9 @@ public class MinigameManager implements Listener {
                 game.broadcast(Component.text(secondsLeft[0] + " seconds remaining!", NamedTextColor.YELLOW));
             }
             if (secondsLeft[0] <= 0) {
-                plugin.getEventManager().autoBoardRemaining();
                 Minigame ended = currentGame;
                 stopGame();
+                plugin.getEventManager().autoBoardRemaining();
                 if (ended != null) plugin.getEventManager().onMinigameEnded(ended);
             }
         }, 20L, 20L);
